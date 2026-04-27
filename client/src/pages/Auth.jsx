@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock, User, Github, Chrome } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Github, Globe } from 'lucide-react';
+
 import { useUserStore } from '../store/useUserStore';
 
 export default function Auth() {
@@ -221,12 +222,13 @@ export default function Auth() {
 
             <div style={{ display: 'flex', gap: '1rem' }}>
               <button type="button" className="btn" style={{ flex: 1, padding: '0.8rem' }}>
-                <Chrome size={20} />
+                <Globe size={20} />
               </button>
               <button type="button" className="btn" style={{ flex: 1, padding: '0.8rem' }}>
                 <Github size={20} />
               </button>
             </div>
+
             
             {isLogin && (
               <button type="button" style={{ color: 'var(--text-dim)', fontSize: '0.85rem', marginTop: '0.5rem', textDecoration: 'underline' }}>
