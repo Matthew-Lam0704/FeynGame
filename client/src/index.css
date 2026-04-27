@@ -196,7 +196,47 @@ a {
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(232, 245, 232, 0.2);
+.btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+input:focus, select:focus {
+  border-color: var(--accent-yellow) !important;
+  box-shadow: 0 0 15px rgba(245, 200, 66, 0.15);
+  background: rgba(255, 255, 255, 0.05) !important;
+}
+
+.input-group:focus-within label {
+  color: var(--accent-yellow) !important;
+}
+
+/* Page Transitions */
+.page-enter {
+  opacity: 0;
+  transform: translateX(20px);
+}
+.page-enter-active {
+  opacity: 1;
+  transform: translateX(0);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.page-exit {
+  opacity: 1;
+  transform: translateX(0);
+}
+.page-exit-active {
+  opacity: 0;
+  transform: translateX(-20px);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.error-shake {
+  animation: shake 0.2s ease-in-out 0s 2;
 }
 

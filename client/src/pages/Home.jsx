@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CreateRoomModal from '../components/CreateRoomModal';
+import ProfileHUD from '../components/ProfileHUD';
 import { Play, Users, Hash } from 'lucide-react';
 
 export default function Home() {
@@ -16,8 +17,10 @@ export default function Home() {
   };
 
   return (
-    <div className="home-container" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+    <div className="home-container" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', position: 'relative' }}>
       
+      <ProfileHUD />
+
       <header style={{ textAlign: 'center', marginBottom: '4rem' }} className="animate-fade-in">
         <h1 style={{ fontSize: '4rem', color: 'var(--text-chalk)', marginBottom: '1rem' }}>
           Feynman Club
