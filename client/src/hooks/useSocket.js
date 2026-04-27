@@ -41,11 +41,13 @@ export const useSocket = (roomId, playerName) => {
     }
   };
 
-  return {
+    return {
     socket: socketRef.current,
+    socketId: socketRef.current?.id,
     roomState,
     isConnected,
     toggleReady,
     startGame
   };
 };
+
