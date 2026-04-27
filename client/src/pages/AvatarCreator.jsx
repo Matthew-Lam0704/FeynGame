@@ -10,7 +10,9 @@ export default function AvatarCreator() {
   const [isLoaded, setIsLoaded] = useState(false);
   const frameRef = useRef(null);
 
-  const RPM_URL = 'https://feyn-club.readyplayer.me/avatar?frameApi';
+  const RPM_URL = 'https://readyplayer.me/avatar?frameApi';
+
+
 
   useEffect(() => {
     const handleMessage = (event) => {
@@ -82,12 +84,19 @@ export default function AvatarCreator() {
 
       </main>
 
-      <footer style={{ padding: '2rem', display: 'flex', justifyContent: 'center', borderTop: '1px solid rgba(232,245,232,0.1)' }}>
+      <footer style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', borderTop: '1px solid rgba(232,245,232,0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', color: 'var(--text-dim)' }}>
           <span>Ready to enter the classroom?</span>
           <ArrowRight size={20} />
         </div>
+        <button 
+          onClick={() => navigate('/')}
+          style={{ color: 'var(--text-dim)', fontSize: '0.8rem', textDecoration: 'underline', marginTop: '0.5rem' }}
+        >
+          Skip customization for now
+        </button>
       </footer>
+
 
       <style>{`
         .spinner {
