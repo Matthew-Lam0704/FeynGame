@@ -1,9 +1,37 @@
 import React, { useRef, useState, useEffect } from 'react';
 
-export default function Whiteboard({ isExplainer, color, size, tool }) {
+export default function Whiteboard({ isExplainer, color, size, tool, socket, roomId }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  // Sync logic for audience
+  useEffect(() => {
+    if (!socket || isExplainer) return;
+
+    socket.on('stroke:replay', (stroke) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      
+      const x = stroke.x * canvas.width;
+      const y = stroke.y * canvas.height;
+
+      if (stroke.type === 'start') {
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+      } else if (stroke.type === 'draw') {
+        ctx.strokeStyle = stroke.tool === 'eraser' ? '#1e2e1e' : stroke.color;
+        ctx.lineWidth = stroke.tool === 'eraser' ? stroke.size * 3 : stroke.size;
+        ctx.lineTo(x, y);
+        ctx.stroke();
+      } else if (stroke.type === 'stop') {
+        ctx.closePath();
+      }
+    });
+
+    return () => socket.off('stroke:replay');
+  }, [socket, isExplainer]);
 
   // Set up canvas context and scaling
   useEffect(() => {
@@ -11,7 +39,6 @@ export default function Whiteboard({ isExplainer, color, size, tool }) {
     const container = containerRef.current;
     if (!canvas || !container) return;
 
-    // Fixed aspect ratio 16:9
     const updateSize = () => {
       const rect = container.getBoundingClientRect();
       canvas.width = rect.width;
@@ -20,7 +47,6 @@ export default function Whiteboard({ isExplainer, color, size, tool }) {
       const ctx = canvas.getContext('2d');
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      // Fill with dark chalkboard color
       ctx.fillStyle = '#1e2e1e';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
     };
@@ -29,6 +55,22 @@ export default function Whiteboard({ isExplainer, color, size, tool }) {
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
   }, []);
+
+  const emitStroke = (type, x, y) => {
+    if (!socket || !roomId) return;
+    const canvas = canvasRef.current;
+    socket.emit('stroke:draw', {
+      roomId,
+      stroke: {
+        type,
+        x: x / canvas.width,
+        y: y / canvas.height,
+        color,
+        size,
+        tool
+      }
+    });
+  };
 
   const startDrawing = (e) => {
     if (!isExplainer) return;
@@ -41,8 +83,7 @@ export default function Whiteboard({ isExplainer, color, size, tool }) {
     ctx.beginPath();
     ctx.moveTo(x, y);
     setIsDrawing(true);
-
-    // In future: emit socket event start
+    emitStroke('start', x, y);
   };
 
   const draw = (e) => {
@@ -54,8 +95,8 @@ export default function Whiteboard({ isExplainer, color, size, tool }) {
     const y = e.clientY - rect.top;
 
     if (tool === 'eraser') {
-      ctx.strokeStyle = '#1e2e1e'; // Background color
-      ctx.lineWidth = size * 3; // Eraser is bigger
+      ctx.strokeStyle = '#1e2e1e';
+      ctx.lineWidth = size * 3;
     } else {
       ctx.strokeStyle = color;
       ctx.lineWidth = size;
@@ -63,8 +104,7 @@ export default function Whiteboard({ isExplainer, color, size, tool }) {
 
     ctx.lineTo(x, y);
     ctx.stroke();
-
-    // In future: emit socket event move
+    emitStroke('draw', x, y);
   };
 
   const stopDrawing = () => {
@@ -72,8 +112,7 @@ export default function Whiteboard({ isExplainer, color, size, tool }) {
     const ctx = canvasRef.current.getContext('2d');
     ctx.closePath();
     setIsDrawing(false);
-
-    // In future: emit socket event end
+    emitStroke('stop');
   };
 
   return (

@@ -1,36 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Copy, CheckCircle, Circle, Play } from 'lucide-react';
-// import { io } from 'socket.io-client';
+import { useSocket } from '../hooks/useSocket';
 
 export default function Lobby() {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  const [players, setPlayers] = useState([
-    { id: '1', name: 'You', isReady: false, isHost: true },
-    // Mock other players for now
-    { id: '2', name: 'Alice', isReady: true, isHost: false },
-  ]);
+  const [playerName] = useState(`Player ${Math.floor(Math.random() * 1000)}`);
+  
+  const { roomState, isConnected, toggleReady, startGame } = useSocket(roomId, playerName);
   const [isCopied, setIsCopied] = useState(false);
 
-  const me = players.find(p => p.id === '1');
-  const allReady = players.every(p => p.isReady);
+  useEffect(() => {
+    if (roomState?.status === 'playing') {
+      navigate(`/game/${roomId}`);
+    }
+  }, [roomState, roomId, navigate]);
+
+  if (!isConnected || !roomState) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', color: 'var(--text-dim)' }}>
+        Connecting to chalk server...
+      </div>
+    );
+  }
+
+  const players = roomState.players;
+  const me = players.find(p => p.id === roomState.players.find(pl => pl.name === playerName)?.id) || players[0];
+  const allReady = players.length >= 2 && players.every(p => p.isReady);
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomId);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const toggleReady = () => {
-    setPlayers(players.map(p => p.id === '1' ? { ...p, isReady: !p.isReady } : p));
-  };
-
-  const startGame = () => {
-    if (allReady) {
-      // navigate(`/game/${roomId}`);
-      alert("Game start logic goes here!");
-    }
   };
 
   return (

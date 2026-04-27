@@ -1,19 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import Whiteboard from '../components/Whiteboard';
+import { useSocket } from '../hooks/useSocket';
 import { Pen, Eraser, Trash2, Clock, Mic, MicOff } from 'lucide-react';
 
 export default function Game() {
   const { roomId } = useParams();
+  const [playerName] = useState(`Player ${Math.floor(Math.random() * 1000)}`);
+  const { socket, roomState, isConnected } = useSocket(roomId, playerName);
   
-  // Mock state for UI dev
-  const [isExplainer, setIsExplainer] = useState(true);
   const [topic, setTopic] = useState("Mitosis");
-  const [timeRemaining, setTimeRemaining] = useState(85);
+  const [timeRemaining, setTimeRemaining] = useState(90);
   const [color, setColor] = useState('#e8f5e8');
   const [size, setSize] = useState(3);
   const [tool, setTool] = useState('pen');
   const [micActive, setMicActive] = useState(true);
+
+  useEffect(() => {
+    if (socket) {
+      socket.on('timer_sync', (time) => setTimeRemaining(time));
+      return () => socket.off('timer_sync');
+    }
+  }, [socket]);
+
+  if (!isConnected || !roomState) {
+    return <div style={{ color: 'var(--text-dim)', padding: '2rem' }}>Reconnecting to game...</div>;
+  }
+
+  const explainer = roomState.players[roomState.currentExplainerIndex || 0];
+  const isExplainer = socket.id === explainer?.id;
 
   const colors = [
     { name: 'White', hex: '#e8f5e8' },
@@ -26,6 +41,12 @@ export default function Game() {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
     return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const submitScore = (val) => {
+    if (socket && roomId) {
+      socket.emit('submit_score', { roomId, score: val });
+    }
   };
 
   return (
@@ -133,7 +154,14 @@ export default function Game() {
 
         {/* Board Container */}
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-          <Whiteboard isExplainer={isExplainer} color={color} size={size} tool={tool} />
+          <Whiteboard 
+            isExplainer={isExplainer} 
+            color={color} 
+            size={size} 
+            tool={tool} 
+            socket={socket}
+            roomId={roomId}
+          />
           
           {/* Bottom Bar: Mic for explainer, Scoring for audience */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 1rem' }}>
@@ -158,10 +186,15 @@ export default function Game() {
                 <span style={{ color: 'var(--text-dim)' }}>Rate this explanation:</span>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   {[1,2,3,4,5].map(score => (
-                    <button key={score} className="glass-panel" style={{ 
-                      width: '48px', height: '48px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
-                      border: 'var(--border-chalk)'
-                    }}>
+                    <button 
+                      key={score} 
+                      onClick={() => submitScore(score)}
+                      className="glass-panel" 
+                      style={{ 
+                        width: '48px', height: '48px', borderRadius: '8px', fontSize: '1.2rem', fontWeight: 'bold',
+                        border: 'var(--border-chalk)'
+                      }}
+                    >
                       {score}
                     </button>
                   ))}

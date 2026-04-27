@@ -100,8 +100,18 @@ a {
   100% { color: var(--accent-red); transform: scale(1); }
 }
 
+@keyframes topicDrop {
+  0% { transform: translateY(-100px); opacity: 0; }
+  60% { transform: translateY(10px); }
+  100% { transform: translateY(0); opacity: 1; }
+}
+
 .animate-fade-in {
   animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-topic-drop {
+  animation: topicDrop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
 .glass-panel {
