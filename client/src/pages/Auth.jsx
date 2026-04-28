@@ -60,11 +60,13 @@ export default function Auth() {
         const { error: authError } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { username } },
+          options: {
+            data: { username },
+            emailRedirectTo: `${window.location.origin}/`,
+          },
         });
         if (authError) throw authError;
-        // Supabase may require email confirmation — navigate only after real session
-        navigate('/avatar-creator');
+        setSuccessMsg('Account created! Check your email for a confirmation link before logging in.');
       }
     } catch (err) {
       setError(err.message);
