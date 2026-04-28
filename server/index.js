@@ -82,7 +82,7 @@ app.get('/rooms', (_req, res) => {
 
 app.post('/delete-account', async (req, res) => {
   if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Account deletion not configured on this server. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars.' });
+    return res.status(503).json({ error: 'Account deletion not configured — add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to Railway env vars.' });
   }
 
   const auth = req.headers.authorization;
@@ -90,14 +90,31 @@ app.post('/delete-account', async (req, res) => {
     return res.status(401).json({ error: 'Missing authorization header' });
   }
 
-  const token = auth.slice(7);
-  const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
-  if (userError || !user) {
-    return res.status(401).json({ error: 'Invalid or expired token' });
+  // Decode JWT payload to extract user ID (Supabase JWTs are RS256-signed)
+  let userId;
+  try {
+    const payload = JSON.parse(
+      Buffer.from(auth.slice(7).split('.')[1], 'base64url').toString('utf8')
+    );
+    userId = payload.sub;
+    if (!userId) throw new Error('no sub');
+    // Reject clearly expired tokens
+    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+      return res.status(401).json({ error: 'Token has expired — please sign in again' });
+    }
+  } catch {
+    return res.status(401).json({ error: 'Invalid token format' });
   }
 
-  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+  // Verify user actually exists before deleting
+  const { data: { user }, error: lookupError } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (lookupError || !user) {
+    return res.status(401).json({ error: 'User not found' });
+  }
+
+  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
   if (deleteError) {
+    console.error('delete-account error:', deleteError);
     return res.status(500).json({ error: deleteError.message });
   }
 
