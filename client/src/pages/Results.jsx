@@ -20,6 +20,12 @@ export default function Results() {
   }));
 
   return (
+    <div style={{ 
+      padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh', 
+      background: 'radial-gradient(circle at center, #243824 0%, #1e2e1e 100%)',
+      position: 'relative', overflow: 'hidden'
+    }}>
+      {/* Background Texture */}
       <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.05, zIndex: 0 }}>
         <img src="https://www.transparenttextures.com/patterns/dark-matter.png" alt="" style={{ width: '100%', height: '100%' }} />
       </div>
@@ -34,12 +40,12 @@ export default function Results() {
         <h1 style={{ fontSize: '5rem', color: 'var(--text-chalk)', fontFamily: 'var(--font-serif)', marginBottom: '0.5rem', textShadow: '2px 2px 0px rgba(0,0,0,0.5), 0 0 20px rgba(232, 245, 232, 0.2)' }}>
           Final Results
         </h1>
-        <p style={{ color: 'var(--text-dim)', fontSize: '1.4rem', fontStyle: 'italic', maxWidth: '600px' }}>
+        <p style={{ color: 'var(--text-dim)', fontSize: '1.4rem', fontStyle: 'italic', maxWidth: '600px', margin: '0 auto' }}>
           "Simplicity is the ultimate sophistication." — Leonardo da Vinci
         </p>
       </header>
 
-      <main style={{ width: '100%', maxWidth: '700px', marginBottom: '4rem' }}>
+      <main style={{ width: '100%', maxWidth: '700px', marginBottom: '4rem', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {results.map((player, i) => (
             <div 
@@ -86,7 +92,7 @@ export default function Results() {
         </div>
       </main>
 
-      <footer style={{ display: 'flex', gap: '2rem' }}>
+      <footer style={{ display: 'flex', gap: '2rem', position: 'relative', zIndex: 1 }}>
         <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ 
           display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '1rem 2rem', fontSize: '1.1rem',
           background: 'transparent', border: '2px solid var(--text-chalk)', color: 'var(--text-chalk)', borderRadius: '12px'
@@ -106,4 +112,3 @@ export default function Results() {
     </div>
   );
 }
-
