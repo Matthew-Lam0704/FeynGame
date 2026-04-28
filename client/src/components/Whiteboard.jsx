@@ -30,7 +30,18 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       }
     });
 
-    return () => socket.off('stroke:replay');
+    socket.on('canvas_clear', () => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1e2e1e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    });
+
+    return () => {
+      socket.off('stroke:replay');
+      socket.off('canvas_clear');
+    };
   }, [socket, isExplainer]);
 
   // Set up canvas context and scaling

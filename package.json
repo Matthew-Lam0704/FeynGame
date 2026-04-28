@@ -1,0 +1,14 @@
+{
+  "name": "feynman-club",
+  "version": "1.0.0",
+  "description": "Feynman Club — explain it simply. win.",
+  "scripts": {
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && node index.js",
+    "client": "cd client && npm run dev",
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
