@@ -42,6 +42,13 @@ export default function Game() {
     }
   }, [socket, play]);
 
+  // Sync timer from server state whenever a new round starts
+  useEffect(() => {
+    if (roomState?.status === 'playing' && roomState.timer !== undefined) {
+      setTimeRemaining(roomState.timer);
+    }
+  }, [roomState?.currentExplainerIndex]);
+
   useEffect(() => {
     if (roomState?.status === 'playing') {
       play('WHOOSH');

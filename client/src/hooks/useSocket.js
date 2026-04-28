@@ -1,54 +1,45 @@
-import { useEffect, useRef, useState } from 'react';
-import { io } from 'socket.io-client';
-
-const rawSocketUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
-const SOCKET_URL = rawSocketUrl.startsWith('http') ? rawSocketUrl : `https://${rawSocketUrl}`;
+import { useEffect, useState } from 'react';
+import { socket } from '../lib/socket';
 
 export const useSocket = (roomId, playerName) => {
-  const socketRef = useRef(null);
   const [roomState, setRoomState] = useState(null);
-  const [isConnected, setIsConnected] = useState(false);
+  const [isConnected, setIsConnected] = useState(socket.connected);
 
   useEffect(() => {
-    socketRef.current = io(SOCKET_URL);
-
-    socketRef.current.on('connect', () => {
+    const onConnect = () => {
       setIsConnected(true);
-      socketRef.current.emit('join_room', { roomId, playerName });
-    });
+      socket.emit('join_room', { roomId, playerName });
+    };
 
-    socketRef.current.on('room_state_update', (state) => {
-      setRoomState(state);
-    });
+    const onRoomStateUpdate = (state) => setRoomState(state);
+    const onDisconnect = () => setIsConnected(false);
 
-    socketRef.current.on('disconnect', () => {
-      setIsConnected(false);
-    });
+    socket.on('connect', onConnect);
+    socket.on('room_state_update', onRoomStateUpdate);
+    socket.on('disconnect', onDisconnect);
+
+    // Already connected — emit join immediately so we get current room state
+    if (socket.connected) {
+      socket.emit('join_room', { roomId, playerName });
+    }
 
     return () => {
-      socketRef.current.disconnect();
+      socket.off('connect', onConnect);
+      socket.off('room_state_update', onRoomStateUpdate);
+      socket.off('disconnect', onDisconnect);
+      // Never disconnect the singleton — it must survive page navigation
     };
   }, [roomId, playerName]);
 
-  const toggleReady = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('toggle_ready', { roomId });
-    }
-  };
+  const toggleReady = () => socket.emit('toggle_ready', { roomId });
+  const startGame = ({ subject } = {}) => socket.emit('start_game', { roomId, subject });
 
-  const startGame = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('start_game', { roomId });
-    }
-  };
-
-    return {
-    socket: socketRef.current,
-    socketId: socketRef.current?.id,
+  return {
+    socket,
+    socketId: socket.id,
     roomState,
     isConnected,
     toggleReady,
-    startGame
+    startGame,
   };
 };
-
