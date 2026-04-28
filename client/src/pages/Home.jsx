@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import CreateRoomModal from '../components/CreateRoomModal';
 import ProfileHUD from '../components/ProfileHUD';
 import { Play, Users, Hash } from 'lucide-react';
 
+const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SERVER_URL = rawServerUrl.startsWith('http') ? rawServerUrl : `https://${rawServerUrl}`;
+
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [joinCode, setJoinCode] = useState('');
+  const [publicRooms, setPublicRooms] = useState([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchRooms = () => {
+      fetch(`${SERVER_URL}/rooms`)
+        .then(r => r.json())
+        .then(setPublicRooms)
+        .catch(() => {});
+    };
+    fetchRooms();
+    const interval = setInterval(fetchRooms, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleJoinCode = (e) => {
     e.preventDefault();
@@ -67,15 +83,37 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Public Rooms Section (Stub) */}
+      {/* Public Rooms Section */}
       <section style={{ marginTop: '4rem', width: '100%', maxWidth: '800px' }} className="animate-fade-in">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: 'var(--border-chalk)', paddingBottom: '0.5rem' }}>
           <Users size={24} color="var(--text-chalk)" />
           <h2 style={{ fontSize: '1.5rem' }}>Live Public Rooms</h2>
         </div>
-        <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: '2rem', border: '1px dashed rgba(232,245,232,0.2)', borderRadius: '8px' }}>
-          No public rooms currently available.
-        </div>
+        {publicRooms.length === 0 ? (
+          <div style={{ color: 'var(--text-dim)', textAlign: 'center', padding: '2rem', border: '1px dashed rgba(232,245,232,0.2)', borderRadius: '8px' }}>
+            No public rooms currently available.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {publicRooms.map(room => (
+              <div key={room.id} className="glass-panel" style={{ padding: '1rem 1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div>
+                  <span style={{ fontWeight: 'bold', color: 'var(--text-chalk)' }}>{room.name}</span>
+                  <span style={{ marginLeft: '1rem', color: 'var(--text-dim)', fontSize: '0.9rem' }}>
+                    {room.players}/{room.maxPlayers} players
+                  </span>
+                </div>
+                <button
+                  className="btn"
+                  onClick={() => navigate(`/room/${room.id}`)}
+                  style={{ padding: '0.5rem 1.25rem', border: '1px solid var(--accent-blue)', color: 'var(--text-chalk)' }}
+                >
+                  Join
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </section>
 
       {isModalOpen && <CreateRoomModal onClose={() => setIsModalOpen(false)} />}

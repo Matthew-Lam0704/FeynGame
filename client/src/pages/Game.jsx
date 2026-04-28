@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Whiteboard from '../components/Whiteboard';
+import TopicCard from '../components/TopicCard';
 import { useSocket } from '../hooks/useSocket';
-import { Pen, Eraser, Trash2, Clock, Mic, MicOff, Trophy } from 'lucide-react';
+import { useAudio } from '../hooks/useAudio';
+import { useSounds } from '../hooks/useSounds';
+import { Pen, Eraser, Trash2, Clock, Mic, MicOff } from 'lucide-react';
 
 export default function Game() {
   const { roomId } = useParams();
@@ -10,31 +13,55 @@ export default function Game() {
   const [playerName] = useState(localStorage.getItem('playerName') || `Player ${Math.floor(Math.random() * 1000)}`);
   const { socket, roomState, isConnected } = useSocket(roomId, playerName);
   
+  const explainer = roomState?.players[roomState.currentExplainerIndex];
+  const isExplainer = socket?.id === explainer?.id;
+  const [micActive, setMicActive] = useState(true);
+
+  // Initialize Audio
+  const { room: audioRoom, error: audioError } = useAudio(roomId, playerName, isExplainer, micActive);
+  
   const [timeRemaining, setTimeRemaining] = useState(90);
+  const [transitionTime, setTransitionTime] = useState(5);
   const [color, setColor] = useState('#e8f5e8');
   const [size, setSize] = useState(3);
   const [tool, setTool] = useState('pen');
-  const [micActive, setMicActive] = useState(true);
+
+  const { play } = useSounds();
 
   useEffect(() => {
     if (socket) {
-      socket.on('timer_sync', (time) => setTimeRemaining(time));
-      return () => socket.off('timer_sync');
+      socket.on('timer_sync', (time) => {
+        setTimeRemaining(time);
+        if (time <= 10 && time > 0) play('TICK');
+      });
+      socket.on('transition_timer_sync', (time) => setTransitionTime(time));
+      return () => {
+        socket.off('timer_sync');
+        socket.off('transition_timer_sync');
+      };
     }
-  }, [socket]);
+  }, [socket, play]);
+
+  // Sync timer from server state whenever a new round starts
+  useEffect(() => {
+    if (roomState?.status === 'playing' && roomState.timer !== undefined) {
+      setTimeRemaining(roomState.timer);
+    }
+  }, [roomState?.currentExplainerIndex]);
 
   useEffect(() => {
-    if (roomState?.status === 'results') {
+    if (roomState?.status === 'playing') {
+      play('WHOOSH');
+    } else if (roomState?.status === 'between_rounds') {
+      play('BELL');
+    } else if (roomState?.status === 'results') {
       navigate(`/results/${roomId}`);
     }
-  }, [roomState?.status, navigate, roomId]);
+  }, [roomState?.status, play, navigate, roomId]);
 
   if (!isConnected || !roomState) {
     return <div className="loading-container" style={{ color: 'var(--text-dim)', padding: '2rem' }}>Reconnecting to game...</div>;
   }
-
-  const explainer = roomState.players[roomState.currentExplainerIndex];
-  const isExplainer = socket.id === explainer?.id;
 
   if (roomState.status === 'between_rounds') {
     return (
@@ -54,9 +81,14 @@ export default function Game() {
             </div>
           ))}
         </div>
-        <p style={{ fontSize: '1.5rem', color: 'var(--text-dim)' }}>
-          Next up: <span style={{ color: 'var(--text-chalk)' }}>{roomState.players[(roomState.currentExplainerIndex + 1) % roomState.players.length]?.name}</span>
-        </p>
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '1.5rem', color: 'var(--text-dim)' }}>
+            Next up: <span style={{ color: 'var(--text-chalk)' }}>{roomState.players[(roomState.currentExplainerIndex + 1) % roomState.players.length]?.name}</span>
+          </p>
+          <p style={{ fontSize: '1.2rem', color: 'var(--accent-yellow)', marginTop: '1rem' }}>
+            Starting in {transitionTime}s...
+          </p>
+        </div>
       </div>
     );
   }
@@ -83,21 +115,11 @@ export default function Game() {
   return (
     <div className="game-layout" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', height: '100vh', gap: '1rem' }}>
       
+      <TopicCard topic={roomState.topic?.topic} subject={roomState.topic?.subject} />
+      
       {/* Top Bar */}
       <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div className="topic-badge" style={{ 
-            padding: '0.5rem 1rem', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '8px',
-            border: 'var(--border-chalk)', backdropFilter: 'blur(10px)'
-          }}>
-            <span style={{ color: 'var(--text-dim)', marginRight: '0.5rem', fontSize: '0.8rem', textTransform: 'uppercase' }}>
-              Explain:
-            </span>
-            <span style={{ fontFamily: 'var(--font-serif)', fontSize: '1.4rem', color: 'var(--accent-yellow)' }}>
-              {roomState.topic?.topic || "Loading..."}
-            </span>
-          </div>
-          
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             {roomState.players.map(p => (
               <div key={p.id} style={{ 
@@ -157,6 +179,17 @@ export default function Game() {
               style={{ padding: '12px', background: tool === 'eraser' ? 'rgba(255, 255, 255, 0.1)' : 'transparent', borderRadius: '12px' }}
             >
               <Eraser size={28} color={tool === 'eraser' ? 'var(--accent-yellow)' : 'var(--text-chalk)'} />
+            </button>
+            <button 
+              onClick={() => {
+                if (socket && roomId) {
+                  socket.emit('stroke:clear', { roomId });
+                }
+              }}
+              className="tool-btn"
+              style={{ padding: '12px', borderRadius: '12px' }}
+            >
+              <Trash2 size={28} color="var(--accent-red)" />
             </button>
 
             <div style={{ width: '60%', height: '1px', background: 'rgba(232, 245, 232, 0.1)', margin: '0.5rem 0' }}></div>
@@ -281,4 +314,3 @@ export default function Game() {
     </div>
   );
 }
-

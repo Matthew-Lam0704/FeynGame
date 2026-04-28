@@ -11,8 +11,11 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.4.1",
+    "livekit-server-sdk": "^2.15.2",
     "socket.io": "^4.8.3"
   }
 }

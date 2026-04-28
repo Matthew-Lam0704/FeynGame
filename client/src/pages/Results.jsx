@@ -20,20 +20,32 @@ export default function Results() {
   }));
 
   return (
-    <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh', background: 'radial-gradient(circle at center, #243824 0%, #1e2e1e 100%)' }}>
-      
-      <header style={{ textAlign: 'center', marginBottom: '3rem' }} className="animate-fade-in">
+    <div style={{ 
+      padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh', 
+      background: 'radial-gradient(circle at center, #243824 0%, #1e2e1e 100%)',
+      position: 'relative', overflow: 'hidden'
+    }}>
+      {/* Background Texture */}
+      <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: 0.05, zIndex: 0 }}>
+        <img src="https://www.transparenttextures.com/patterns/dark-matter.png" alt="" style={{ width: '100%', height: '100%' }} />
+      </div>
+
+      <header style={{ textAlign: 'center', marginBottom: '3rem', position: 'relative', zIndex: 1 }} className="animate-fade-in">
         <div style={{ position: 'relative', display: 'inline-block' }}>
           <Trophy size={100} color="#f5c842" style={{ marginBottom: '1rem', filter: 'drop-shadow(0 0 15px rgba(245, 200, 66, 0.4))' }} />
-          <div style={{ position: 'absolute', top: -10, right: -10, transform: 'rotate(20deg)' }}>
-            <span style={{ fontSize: '3rem' }}>🎓</span>
+          <div style={{ position: 'absolute', top: -20, right: -25, transform: 'rotate(15deg)', animation: 'pulseRed 2s infinite' }}>
+            <span style={{ fontSize: '4rem', filter: 'drop-shadow(0 0 10px rgba(255,255,255,0.5))' }}>👑</span>
           </div>
         </div>
-        <h1 style={{ fontSize: '4rem', color: 'var(--text-chalk)', fontFamily: 'var(--font-serif)', marginBottom: '0.5rem' }}>Final Results</h1>
-        <p style={{ color: 'var(--text-dim)', fontSize: '1.4rem', fontStyle: 'italic' }}>Class dismissed. Great job, scholars!</p>
+        <h1 style={{ fontSize: '5rem', color: 'var(--text-chalk)', fontFamily: 'var(--font-serif)', marginBottom: '0.5rem', textShadow: '2px 2px 0px rgba(0,0,0,0.5), 0 0 20px rgba(232, 245, 232, 0.2)' }}>
+          Final Results
+        </h1>
+        <p style={{ color: 'var(--text-dim)', fontSize: '1.4rem', fontStyle: 'italic', maxWidth: '600px', margin: '0 auto' }}>
+          "Simplicity is the ultimate sophistication." — Leonardo da Vinci
+        </p>
       </header>
 
-      <main style={{ width: '100%', maxWidth: '700px', marginBottom: '4rem' }}>
+      <main style={{ width: '100%', maxWidth: '700px', marginBottom: '4rem', position: 'relative', zIndex: 1 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {results.map((player, i) => (
             <div 
@@ -80,7 +92,7 @@ export default function Results() {
         </div>
       </main>
 
-      <footer style={{ display: 'flex', gap: '2rem' }}>
+      <footer style={{ display: 'flex', gap: '2rem', position: 'relative', zIndex: 1 }}>
         <button className="btn btn-secondary" onClick={() => navigate('/')} style={{ 
           display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '1rem 2rem', fontSize: '1.1rem',
           background: 'transparent', border: '2px solid var(--text-chalk)', color: 'var(--text-chalk)', borderRadius: '12px'
@@ -100,4 +112,3 @@ export default function Results() {
     </div>
   );
 }
-
