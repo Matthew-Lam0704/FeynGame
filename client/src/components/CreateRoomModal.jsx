@@ -9,11 +9,15 @@ export default function CreateRoomModal({ onClose }) {
   const [maxPlayers, setMaxPlayers] = useState(4);
   const navigate = useNavigate();
 
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
-    // In a real implementation, we'd call the backend API here.
-    // For now, we'll generate a random code and redirect to the lobby.
     const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const serverUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+    await fetch(`${serverUrl}/rooms`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ roomId: roomCode, name: roomName, isPublic, maxPlayers }),
+    });
     navigate(`/room/${roomCode}`);
   };
 

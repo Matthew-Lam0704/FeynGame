@@ -1,8 +1,11 @@
 const rooms = new Map();
 
-const createRoom = (roomId) => {
+const createRoom = (roomId, { name = roomId, isPublic = false, maxPlayers = 4 } = {}) => {
   const room = {
     id: roomId,
+    name,
+    isPublic,
+    maxPlayers,
     players: [],
     status: 'lobby',
     currentRound: 0,

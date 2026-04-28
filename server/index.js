@@ -14,6 +14,30 @@ app.use(express.json());
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || 'devkey';
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || 'secret';
 
+app.post('/rooms', (req, res) => {
+  const { roomId, name, isPublic, maxPlayers } = req.body;
+  if (!roomId) return res.status(400).json({ error: 'Missing roomId' });
+  if (!getRoom(roomId)) {
+    createRoom(roomId, { name, isPublic, maxPlayers });
+  }
+  res.json({ roomId });
+});
+
+app.get('/rooms', (_req, res) => {
+  const publicRooms = [];
+  getAllRooms().forEach((room) => {
+    if (room.isPublic && room.status === 'lobby') {
+      publicRooms.push({
+        id: room.id,
+        name: room.name,
+        players: room.players.length,
+        maxPlayers: room.maxPlayers,
+      });
+    }
+  });
+  res.json(publicRooms);
+});
+
 app.get('/token', async (req, res) => {
   const { room, username } = req.query;
   if (!room || !username) {
