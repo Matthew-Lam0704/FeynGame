@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, Settings, Coins, Mail, User as UserIcon, X, ChevronDown } from 'lucide-react';
+import { LogOut, Settings, Coins, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/useUserStore';
+import SettingsModal from './SettingsModal';
 
 export default function ProfileHUD() {
   const [isOpen, setIsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const { user, profile, logout } = useUserStore();
   const username = user?.user_metadata?.username || user?.email?.split('@')[0] || 'Player';
   const navigate = useNavigate();
@@ -107,13 +109,15 @@ export default function ProfileHUD() {
                   <span style={{ fontWeight: 'bold', color: 'var(--accent-yellow)' }}>{profile?.tokens || 0} 🪙</span>
                 </div>
 
-                <MenuButton icon={<Settings size={18} />} label="Settings" sublabel="Coming soon" disabled />
+                <MenuButton icon={<Settings size={18} />} label="Settings" onClick={() => { setIsOpen(false); setSettingsOpen(true); }} />
                 <MenuButton icon={<LogOut size={18} />} label="Log out" onClick={handleLogout} color="var(--accent-red)" />
               </div>
             </motion.div>
           </>
         )}
       </AnimatePresence>
+
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

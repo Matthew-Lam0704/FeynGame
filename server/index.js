@@ -7,6 +7,15 @@ const { AccessToken } = require('livekit-server-sdk');
 const { createRoom, getRoom, deleteRoom, getAllRooms } = require('./rooms');
 const { startNextRound } = require('./gameLoop');
 
+const { createClient } = require('@supabase/supabase-js');
+
+// Supabase admin client (optional — only for account deletion)
+const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    })
+  : null;
+
 // Fail fast if credentials are missing — do not run with insecure defaults
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
 const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET;
@@ -69,6 +78,30 @@ app.get('/rooms', (_req, res) => {
     }
   });
   res.json(publicRooms);
+});
+
+app.post('/delete-account', async (req, res) => {
+  if (!supabaseAdmin) {
+    return res.status(503).json({ error: 'Account deletion not configured on this server. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY env vars.' });
+  }
+
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing authorization header' });
+  }
+
+  const token = auth.slice(7);
+  const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+  if (userError || !user) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(user.id);
+  if (deleteError) {
+    return res.status(500).json({ error: deleteError.message });
+  }
+
+  res.json({ success: true });
 });
 
 app.get('/token', tokenLimiter, async (req, res) => {
