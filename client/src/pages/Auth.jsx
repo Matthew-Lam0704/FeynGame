@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 
 
 import { useUserStore } from '../store/useUserStore';
 
 export default function Auth() {
-  const [isLogin, setIsLogin] = useState(true);
+  const location = useLocation();
+  const initialMode = location.state?.mode;
+  const [isLogin, setIsLogin] = useState(initialMode !== 'signup');
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -55,7 +57,11 @@ export default function Auth() {
     const mockUser = { id: '123', email, username: username || email.split('@')[0] };
     setUser(mockUser);
     localStorage.setItem('playerName', mockUser.username);
-    
+
+    if (!isLogin) {
+      localStorage.setItem('hasVisited', 'true');
+    }
+
     // Redirect to Avatar Creator if Signup, else Home
     navigate(isLogin ? '/' : '/avatar-creator');
   };

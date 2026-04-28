@@ -1,21 +1,35 @@
 import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import Home from './pages/Home'
 import Lobby from './pages/Lobby'
 import Game from './pages/Game'
 import Results from './pages/Results'
 import Auth from './pages/Auth'
 import AvatarCreator from './pages/AvatarCreator'
+import { useUserStore } from './store/useUserStore'
+
+function RequireAuth({ children }) {
+  const user = useUserStore((state) => state.user)
+  const location = useLocation()
+
+  if (!user) {
+    const hasVisited = localStorage.getItem('hasVisited')
+    const mode = hasVisited ? 'login' : 'signup'
+    return <Navigate to="/auth" state={{ mode, from: location }} replace />
+  }
+
+  return children
+}
 
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
       <Route path="/auth" element={<Auth />} />
-      <Route path="/avatar-creator" element={<AvatarCreator />} />
-      <Route path="/room/:roomId" element={<Lobby />} />
-      <Route path="/game/:roomId" element={<Game />} />
-      <Route path="/results/:roomId" element={<Results />} />
+      <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
+      <Route path="/avatar-creator" element={<RequireAuth><AvatarCreator /></RequireAuth>} />
+      <Route path="/room/:roomId" element={<RequireAuth><Lobby /></RequireAuth>} />
+      <Route path="/game/:roomId" element={<RequireAuth><Game /></RequireAuth>} />
+      <Route path="/results/:roomId" element={<RequireAuth><Results /></RequireAuth>} />
     </Routes>
   )
 }
