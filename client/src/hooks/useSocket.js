@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const rawSocketUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SOCKET_URL = rawSocketUrl.startsWith('http') ? rawSocketUrl : `https://${rawSocketUrl}`;
 
 export const useSocket = (roomId, playerName) => {
   const socketRef = useRef(null);

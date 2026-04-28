@@ -4,7 +4,8 @@ import CreateRoomModal from '../components/CreateRoomModal';
 import ProfileHUD from '../components/ProfileHUD';
 import { Play, Users, Hash } from 'lucide-react';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SERVER_URL = rawServerUrl.startsWith('http') ? rawServerUrl : `https://${rawServerUrl}`;
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);

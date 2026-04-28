@@ -5,7 +5,9 @@ import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/useUserStore';
 import { supabase } from '../lib/supabase';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+// Guard against missing protocol (e.g. Vercel dashboard env var without https://)
+const SERVER_URL = rawServerUrl.startsWith('http') ? rawServerUrl : `https://${rawServerUrl}`;
 const RPM_URL = 'https://readyplayer.me/avatar?frameApi';
 
 const NAV = [

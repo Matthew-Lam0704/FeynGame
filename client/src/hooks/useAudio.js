@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { Room, RoomEvent, createLocalAudioTrack } from 'livekit-client';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+const SERVER_URL = rawServerUrl.startsWith('http') ? rawServerUrl : `https://${rawServerUrl}`;
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880';
 
 export const useAudio = (roomId, playerName, isExplainer, micActive) => {
