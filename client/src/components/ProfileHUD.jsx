@@ -7,6 +7,7 @@ import { useUserStore } from '../store/useUserStore';
 export default function ProfileHUD() {
   const [isOpen, setIsOpen] = useState(false);
   const { user, profile, logout } = useUserStore();
+  const username = user?.user_metadata?.username || user?.email?.split('@')[0] || 'Player';
   const navigate = useNavigate();
 
   if (!user) {
@@ -21,13 +22,13 @@ export default function ProfileHUD() {
     );
   }
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/auth');
   };
 
   // Mock avatar if none exists
-  const avatarUrl = profile?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${user.username}`;
+  const avatarUrl = profile?.avatarUrl || `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
 
   return (
     <div style={{ position: 'absolute', top: '2rem', right: '2rem', zIndex: 100 }}>
@@ -50,7 +51,7 @@ export default function ProfileHUD() {
           <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
         <div style={{ textAlign: 'left' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-chalk)' }}>{user.username}</div>
+          <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-chalk)' }}>{username}</div>
           <div style={{ fontSize: '0.75rem', color: 'var(--accent-yellow)', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Coins size={12} /> {profile?.tokens || 0}
           </div>
@@ -91,8 +92,8 @@ export default function ProfileHUD() {
                 }}>
                   <img src={avatarUrl} alt="Large Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
-                <h3 style={{ fontSize: '1.4rem', color: 'var(--text-chalk)' }}>{user.username}</h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{user.email}</p>
+                <h3 style={{ fontSize: '1.4rem', color: 'var(--text-chalk)' }}>{username}</h3>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{user?.email}</p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>

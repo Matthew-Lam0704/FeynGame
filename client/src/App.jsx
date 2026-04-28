@@ -1,24 +1,47 @@
-import React from 'react'
-import { Routes, Route } from 'react-router-dom'
-import Home from './pages/Home'
-import Lobby from './pages/Lobby'
-import Game from './pages/Game'
-import Results from './pages/Results'
-import Auth from './pages/Auth'
-import AvatarCreator from './pages/AvatarCreator'
+import React, { useEffect } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import Home from './pages/Home';
+import Lobby from './pages/Lobby';
+import Game from './pages/Game';
+import Results from './pages/Results';
+import Auth from './pages/Auth';
+import AvatarCreator from './pages/AvatarCreator';
+import { useUserStore } from './store/useUserStore';
 
-function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<Home />} />
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/avatar-creator" element={<AvatarCreator />} />
-      <Route path="/room/:roomId" element={<Lobby />} />
-      <Route path="/game/:roomId" element={<Game />} />
-      <Route path="/results/:roomId" element={<Results />} />
-    </Routes>
-  )
+function ProtectedRoute({ children }) {
+  const user = useUserStore((s) => s.user);
+  const isLoading = useUserStore((s) => s.isLoading);
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
+        <div className="spinner" />
+      </div>
+    );
+  }
+
+  if (!user) return <Navigate to="/auth" replace />;
+  return children;
 }
 
+function App() {
+  const initAuth = useUserStore((s) => s.initAuth);
 
-export default App
+  useEffect(() => {
+    const cleanup = initAuth();
+    return cleanup;
+  }, [initAuth]);
+
+  return (
+    <Routes>
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/avatar-creator" element={<ProtectedRoute><AvatarCreator /></ProtectedRoute>} />
+      <Route path="/room/:roomId" element={<ProtectedRoute><Lobby /></ProtectedRoute>} />
+      <Route path="/game/:roomId" element={<ProtectedRoute><Game /></ProtectedRoute>} />
+      <Route path="/results/:roomId" element={<ProtectedRoute><Results /></ProtectedRoute>} />
+    </Routes>
+  );
+}
+
+export default App;

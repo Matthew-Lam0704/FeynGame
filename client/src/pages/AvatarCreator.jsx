@@ -20,9 +20,7 @@ export default function AvatarCreator() {
 
       if (typeof url === 'string' && url.includes('.glb')) {
         // Avatar created!
-        console.log('Avatar GLB URL:', url);
-        
-        // Mock saving to profile
+        // Save avatar URL to profile
         setProfile({
           avatarUrl: url,
           tokens: 240,

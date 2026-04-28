@@ -19,7 +19,7 @@ export const useSounds = () => {
     
     const audio = audioRefs.current[soundName];
     audio.currentTime = 0;
-    audio.play().catch(e => console.log('Audio play failed:', e));
+    audio.play().catch(() => {});
   };
 
   const stop = (soundName) => {
