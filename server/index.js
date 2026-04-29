@@ -223,11 +223,8 @@ io.on('connection', (socket) => {
   socket.on('end_turn', ({ roomId }) => {
     if (typeof roomId !== 'string') return;
     const room = getRoom(roomId);
-    if (room && room.status === 'playing') {
-      const explainerIndex = room.currentExplainerIndex % room.players.length;
-      if (room.players[explainerIndex]?.id === socket.id) {
-        endRound(io, roomId);
-      }
+    if (room && room.status === 'playing' && room.players.some(p => p.id === socket.id)) {
+      endRound(io, roomId);
     }
   });
 

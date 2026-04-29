@@ -27,6 +27,7 @@ export default function Game() {
   const [color, setColor] = useState('#e8f5e8');
   const [size, setSize] = useState(3);
   const [tool, setTool] = useState('pen');
+  const [showWordPopup, setShowWordPopup] = useState(false);
 
   const { play } = useSounds();
 
@@ -50,6 +51,15 @@ export default function Game() {
   useEffect(() => {
     if (roomState?.status === 'playing' && roomState.timer !== undefined) {
       setTimeRemaining(roomState.timer);
+    }
+  }, [roomState?.currentExplainerIndex]);
+
+  // Show word popup at the start of each round
+  useEffect(() => {
+    if (roomState?.status === 'playing' && roomState?.topic) {
+      setShowWordPopup(true);
+      const t = setTimeout(() => setShowWordPopup(false), 3000);
+      return () => clearTimeout(t);
     }
   }, [roomState?.currentExplainerIndex]);
 
@@ -123,8 +133,48 @@ export default function Game() {
     }
   };
 
+  const topicWord = roomState?.topic?.term || roomState?.topic?.topic;
+  const topicLabel = roomState?.topic
+    ? `${roomState.topic.subject}${roomState.topic.subtopic ? ` · ${roomState.topic.subtopic}` : ''}`
+    : '';
+
   return (
     <div className="game-layout" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', height: '100vh', gap: '1rem' }}>
+
+      {/* Word reveal popup — shown for 3 seconds at round start */}
+      <AnimatePresence>
+        {showWordPopup && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 100,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(6px)',
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.8, y: 30 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 1.05, y: -20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 22 }}
+              style={{ textAlign: 'center', padding: '2rem' }}
+            >
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.2em', marginBottom: '1.2rem' }}>
+                {topicLabel} — your word:
+              </div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: '3.5rem', color: 'var(--accent-yellow)', fontWeight: 'bold', textShadow: '0 0 50px rgba(245,200,66,0.5)', lineHeight: 1.1 }}>
+                {topicWord}
+              </div>
+              <div style={{ marginTop: '1.5rem', color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                Explain this using the Feynman technique
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Top Bar: players | topic | timer + done */}
       <header style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', alignItems: 'center', gap: '1rem' }}>
@@ -155,7 +205,7 @@ export default function Game() {
         {/* Center: topic */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={roomState.topic?.term}
+            key={topicWord}
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
@@ -163,13 +213,13 @@ export default function Game() {
             style={{ textAlign: 'center' }}
           >
             <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>
-              {roomState.topic?.subject} · {roomState.topic?.subtopic} — explain:
+              {topicLabel} — explain:
             </div>
             <div style={{
               fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: 'var(--accent-yellow)',
               fontWeight: 'bold', textShadow: '0 0 20px rgba(245,200,66,0.3)'
             }}>
-              {roomState.topic?.term}
+              {topicWord}
             </div>
           </motion.div>
         </AnimatePresence>
