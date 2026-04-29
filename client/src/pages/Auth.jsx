@@ -52,17 +52,46 @@ export default function Auth() {
       }
     }
 
-    // Mock Login/Signup for Demo
-    const mockUser = { id: '123', email, username: username || email.split('@')[0] };
-    setUser(mockUser);
-    localStorage.setItem('playerName', mockUser.username);
-
-    if (!isLogin) {
-      localStorage.setItem('hasVisited', 'true');
+    setIsSubmitting(true);
+    try {
+      if (isLogin) {
+        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+        if (authError) throw authError;
+        navigate('/');
+      } else {
+        const { error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { username } },
+        });
+        if (authError) throw authError;
+        setSuccessMsg('Check your email to confirm your account, then log in.');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
+  };
 
-    // Redirect to Avatar Creator if Signup, else Home
-    navigate(isLogin ? '/' : '/avatar-creator');
+  const handleOAuth = async (provider) => {
+    setError('');
+    const { error: authError } = await supabase.auth.signInWithOAuth({ provider });
+    if (authError) setError(authError.message);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError('Enter your email address above first.');
+      return;
+    }
+    setError('');
+    const { error: authError } = await supabase.auth.resetPasswordForEmail(email);
+    if (authError) {
+      setError(authError.message);
+    } else {
+      setSuccessMsg('Password reset email sent!');
+    }
   };
 
   return (
