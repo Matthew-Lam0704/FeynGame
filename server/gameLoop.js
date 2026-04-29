@@ -6,16 +6,15 @@ const startNextRound = (io, roomId) => {
   if (!room) return;
 
   room.currentExplainerIndex++;
-  
-  if (room.currentExplainerIndex >= room.players.length) {
-    // Game Over
+
+  if (room.currentExplainerIndex >= (room.totalRounds || room.players.length)) {
     room.status = 'results';
     io.to(roomId).emit('room_state_update', room);
     return;
   }
 
   room.status = 'playing';
-  room.timer = 90;
+  room.timer = room.roundDuration || 90;
   room.topic = getRandomTopic(room.subject);
   room.roundScores = {}; // Reset scores for new round
   
@@ -46,7 +45,8 @@ const endRound = (io, roomId) => {
   room.status = 'between_rounds';
   
   // Calculate final score for the explainer
-  const explainer = room.players[room.currentExplainerIndex];
+  const explainerIndex = room.currentExplainerIndex % room.players.length;
+  const explainer = room.players[explainerIndex];
   if (explainer) {
     const scores = Object.values(room.roundScores);
     if (scores.length > 0) {

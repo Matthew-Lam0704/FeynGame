@@ -154,7 +154,7 @@ export default function Lobby() {
             {me?.isHost && (
               <button 
                 className="btn" 
-                onClick={() => startGame({ subject: 'Biology' })} // Default subject for now
+                onClick={() => startGame()}
                 disabled={!allReady}
                 style={{ 
                   fontSize: '1.3rem', padding: '1rem 3rem', borderRadius: '14px', minWidth: '220px',

@@ -5,15 +5,31 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
   const containerRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
-  // Sync logic for audience
+  // All players listen for canvas_clear (explainer clears locally too)
   useEffect(() => {
-    if (!socket || isExplainer) return;
+    if (!socket) return;
 
-    socket.on('stroke:replay', (stroke) => {
+    const onCanvasClear = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
-      
+      ctx.fillStyle = '#1e2e1e';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    };
+
+    socket.on('canvas_clear', onCanvasClear);
+    return () => socket.off('canvas_clear', onCanvasClear);
+  }, [socket]);
+
+  // Viewers receive stroke replays
+  useEffect(() => {
+    if (!socket || isExplainer) return;
+
+    const onStrokeReplay = (stroke) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
       const x = stroke.x * canvas.width;
       const y = stroke.y * canvas.height;
 
@@ -28,20 +44,10 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       } else if (stroke.type === 'stop') {
         ctx.closePath();
       }
-    });
-
-    socket.on('canvas_clear', () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      ctx.fillStyle = '#1e2e1e';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    });
-
-    return () => {
-      socket.off('stroke:replay');
-      socket.off('canvas_clear');
     };
+
+    socket.on('stroke:replay', onStrokeReplay);
+    return () => socket.off('stroke:replay', onStrokeReplay);
   }, [socket, isExplainer]);
 
   // Set up canvas context and scaling
@@ -54,7 +60,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       const rect = container.getBoundingClientRect();
       canvas.width = rect.width;
       canvas.height = rect.width * (9 / 16);
-      
+
       const ctx = canvas.getContext('2d');
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -72,14 +78,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     const canvas = canvasRef.current;
     socket.emit('stroke:draw', {
       roomId,
-      stroke: {
-        type,
-        x: x / canvas.width,
-        y: y / canvas.height,
-        color,
-        size,
-        tool
-      }
+      stroke: { type, x: x / canvas.width, y: y / canvas.height, color, size, tool }
     });
   };
 
@@ -127,11 +126,11 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
   };
 
   return (
-    <div 
-      ref={containerRef} 
-      style={{ 
-        width: '100%', 
-        border: 'var(--border-chalk)', 
+    <div
+      ref={containerRef}
+      style={{
+        width: '100%',
+        border: 'var(--border-chalk)',
         borderRadius: '12px',
         overflow: 'hidden',
         boxShadow: 'var(--shadow-lg)',
@@ -147,7 +146,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
         onMouseOut={stopDrawing}
         style={{ display: 'block', width: '100%', height: 'auto' }}
       />
-      
+
       {!isExplainer && (
         <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(0,0,0,0.5)', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem' }}>
           Viewing Mode

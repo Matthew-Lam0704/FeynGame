@@ -5,7 +5,7 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const { AccessToken } = require('livekit-server-sdk');
 const { createRoom, getRoom, deleteRoom, getAllRooms } = require('./rooms');
-const { startNextRound } = require('./gameLoop');
+const { startNextRound, endRound } = require('./gameLoop');
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -50,7 +50,7 @@ const roomLimiter = rateLimit({
 });
 
 app.post('/rooms', roomLimiter, (req, res) => {
-  const { roomId, name, isPublic, maxPlayers } = req.body;
+  const { roomId, name, isPublic, maxPlayers, roundDuration, roundsPerPlayer, subject } = req.body;
   if (typeof roomId !== 'string' || !/^[A-Z0-9]{1,20}$/.test(roomId)) {
     return res.status(400).json({ error: 'Invalid roomId' });
   }
@@ -58,9 +58,14 @@ app.post('/rooms', roomLimiter, (req, res) => {
   const safePublic = typeof isPublic === 'boolean' ? isPublic : false;
   const safeMax = Number.isInteger(maxPlayers) && maxPlayers >= 2 && maxPlayers <= 8
     ? maxPlayers : 4;
+  const safeRoundDuration = Number.isInteger(roundDuration) && roundDuration >= 30 && roundDuration <= 300
+    ? roundDuration : 90;
+  const safeRoundsPerPlayer = Number.isInteger(roundsPerPlayer) && roundsPerPlayer >= 1 && roundsPerPlayer <= 5
+    ? roundsPerPlayer : 1;
+  const safeSubject = typeof subject === 'string' ? subject : null;
 
   if (!getRoom(roomId)) {
-    createRoom(roomId, { name: safeName, isPublic: safePublic, maxPlayers: safeMax });
+    createRoom(roomId, { name: safeName, isPublic: safePublic, maxPlayers: safeMax, roundDuration: safeRoundDuration, roundsPerPlayer: safeRoundsPerPlayer, subject: safeSubject });
   }
   res.json({ roomId });
 });
@@ -195,14 +200,24 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('start_game', ({ roomId, subject }) => {
+  socket.on('start_game', ({ roomId }) => {
     if (typeof roomId !== 'string') return;
     const room = getRoom(roomId);
     if (room && room.players.find(p => p.id === socket.id)?.isHost) {
-      room.subject = typeof subject === 'string' ? subject : null;
       room.currentExplainerIndex = -1;
-      room.totalRounds = room.players.length;
+      room.totalRounds = room.players.length * (room.roundsPerPlayer || 1);
       startNextRound(io, roomId);
+    }
+  });
+
+  socket.on('end_turn', ({ roomId }) => {
+    if (typeof roomId !== 'string') return;
+    const room = getRoom(roomId);
+    if (room && room.status === 'playing') {
+      const explainerIndex = room.currentExplainerIndex % room.players.length;
+      if (room.players[explainerIndex]?.id === socket.id) {
+        endRound(io, roomId);
+      }
     }
   });
 
@@ -248,10 +263,9 @@ io.on('connection', (socket) => {
           deleteRoom(roomId);
         } else {
           if (player.isHost) room.players[0].isHost = true;
-          if (room.currentExplainerIndex === playerIndex && room.status === 'playing') {
+          const explainerIndex = room.currentExplainerIndex % Math.max(room.players.length, 1);
+          if (explainerIndex === playerIndex && room.status === 'playing') {
             room.timer = 0;
-          } else if (room.currentExplainerIndex > playerIndex) {
-            room.currentExplainerIndex--;
           }
           io.to(roomId).emit('room_state_update', room);
         }

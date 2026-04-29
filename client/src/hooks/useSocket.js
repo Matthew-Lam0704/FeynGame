@@ -32,7 +32,7 @@ export const useSocket = (roomId, playerName) => {
   }, [roomId, playerName]);
 
   const toggleReady = () => socket.emit('toggle_ready', { roomId });
-  const startGame = ({ subject } = {}) => socket.emit('start_game', { roomId, subject });
+  const startGame = () => socket.emit('start_game', { roomId });
 
   return {
     socket,
