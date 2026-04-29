@@ -1,6 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
+
+const SUBJECT_STRUCTURE = {
+  Chemistry: ["Atomic Structure","Bonding","Energetics","Kinetics","Equilibria","Redox","Electrochemistry","Acids and Bases","Periodicity","Group 2 Metals","Group 7 Halogens","Transition Metals","Nomenclature and Isomerism","Alkanes","Alkenes","Alcohols","Carbonyl Compounds","Carboxylic Acids","Amines and Amino Acids","Polymers"],
+  Physics: ["Kinematics","Forces","Energy and Power","Momentum","Circular Motion","Simple Harmonic Motion","Wave Properties","Stationary Waves","Refraction and Reflection","Interference and Diffraction","Electromagnetic Spectrum","DC Circuits","Capacitors","Gravitational Fields","Electric Fields","Magnetic Fields and Induction","Temperature and Heat","Ideal Gases and Kinetic Theory","Radioactivity","Nuclear Energy","Quantum Physics"],
+  Biology: ["Cell Structure","Cell Transport","Cell Division","Carbohydrates","Proteins","Lipids","Nucleic Acids","Enzymes","Gas Exchange","Transport in Animals","Transport in Plants","Gene Expression","Inheritance","Gene Technology","Ecology","Evolution","Homeostasis and Control","Immune System","Photosynthesis","Respiration"],
+  Maths: ["Algebra","Sequences and Series","Binomial Expansion","Straight Lines and Circles","Parametric Equations","Trigonometric Functions","Identities and Formulae","Differentiation","Integration","Vectors","Proof","Data and Probability","Probability Distributions","Hypothesis Testing","Kinematics (Mechanics)","Forces and Newton's Laws (Mechanics)"],
+  Economics: ["Scarcity and Choice","Production Possibility Frontier","Supply and Demand","Elasticity","Market Structures","Costs and Revenue","Market Failure","National Income","Business Cycles","Unemployment","Inflation","Monetary Policy","Fiscal Policy","Trade","Exchange Rates","Measures of Development","Development Policies"],
+  Geography: ["Plate Tectonics","Volcanic Hazards","Seismic Hazards","Coastal Processes","Coastal Landforms","Coastal Management","Water Cycle","Carbon Cycle","Glaciation and Periglacial","Place and Identity","Economic Globalisation","Cultural and Political Globalisation","Population Dynamics","Migration","Development","Global Health"],
+};
 
 const DURATION_OPTIONS = [
   { label: '30s', value: 30 },
@@ -20,29 +29,17 @@ const chipBase = {
   fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.15s ease', border: '2px solid transparent'
 };
 
+const FIRST_SUBJECT = Object.keys(SUBJECT_STRUCTURE)[0];
+
 export default function CreateRoomModal({ onClose }) {
   const [roomName, setRoomName] = useState('');
-  const [subjectStructure, setSubjectStructure] = useState({});
-  const [subject, setSubject] = useState('');
-  const [subtopic, setSubtopic] = useState('');
+  const [subject, setSubject] = useState(FIRST_SUBJECT);
+  const [subtopic, setSubtopic] = useState(SUBJECT_STRUCTURE[FIRST_SUBJECT][0]);
   const [isPublic, setIsPublic] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [roundDuration, setRoundDuration] = useState(90);
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(1);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const raw = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
-    const serverUrl = raw.startsWith('http') ? raw : `https://${raw}`;
-    fetch(`${serverUrl}/subjects`)
-      .then(r => r.json())
-      .then(data => {
-        setSubjectStructure(data);
-        const firstSubject = Object.keys(data)[0];
-        setSubject(firstSubject);
-        setSubtopic(data[firstSubject][0]);
-      });
-  }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -96,9 +93,9 @@ export default function CreateRoomModal({ onClose }) {
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-dim)' }}>Subject</label>
             <select value={subject} onChange={(e) => {
               setSubject(e.target.value);
-              setSubtopic(subjectStructure[e.target.value][0]);
+              setSubtopic(SUBJECT_STRUCTURE[e.target.value][0]);
             }} style={selectStyle}>
-              {Object.keys(subjectStructure).map(s => (
+              {Object.keys(SUBJECT_STRUCTURE).map(s => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -108,7 +105,7 @@ export default function CreateRoomModal({ onClose }) {
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-dim)' }}>Subtopic</label>
             <select value={subtopic} onChange={(e) => setSubtopic(e.target.value)} style={selectStyle}>
-              {(subjectStructure[subject] || []).map(st => (
+              {(SUBJECT_STRUCTURE[subject] || []).map(st => (
                 <option key={st} value={st}>{st}</option>
               ))}
             </select>
