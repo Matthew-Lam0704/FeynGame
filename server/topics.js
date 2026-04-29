@@ -36,12 +36,25 @@ const getRandomTopic = (subject) => {
 };
 
 const getRandomWord = (subject, subtopic) => {
-  const subjectData = wordBank[subject];
-  if (!subjectData) return { subject, subtopic, term: 'Unknown' };
-  const subtopicTerms = subjectData[subtopic];
-  if (!subtopicTerms || subtopicTerms.length === 0) return { subject, subtopic, term: 'Unknown' };
+  let finalSubject = subject;
+  let finalSubtopic = subtopic;
+
+  if (!finalSubject || !wordBank[finalSubject]) {
+    const subjects = Object.keys(wordBank);
+    finalSubject = subjects[Math.floor(Math.random() * subjects.length)];
+  }
+
+  const subjectData = wordBank[finalSubject];
+  if (!finalSubtopic || !subjectData[finalSubtopic]) {
+    const subtopics = Object.keys(subjectData);
+    finalSubtopic = subtopics[Math.floor(Math.random() * subtopics.length)];
+  }
+
+  const subtopicTerms = subjectData[finalSubtopic];
+  if (!subtopicTerms || subtopicTerms.length === 0) return { subject: finalSubject, subtopic: finalSubtopic, term: 'Unknown' };
+
   const term = subtopicTerms[Math.floor(Math.random() * subtopicTerms.length)];
-  return { subject, subtopic, term };
+  return { subject: finalSubject, subtopic: finalSubtopic, term };
 };
 
 module.exports = { topics, getRandomTopic, wordBank, getRandomWord };

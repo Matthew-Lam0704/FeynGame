@@ -40,7 +40,7 @@ const startNextRound = (io, roomId) => {
 
 const endRound = (io, roomId) => {
   const room = getRoom(roomId);
-  if (!room) return;
+  if (!room || room.status !== 'playing') return;
 
   room.status = 'between_rounds';
   

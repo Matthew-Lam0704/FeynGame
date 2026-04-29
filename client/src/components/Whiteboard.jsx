@@ -125,6 +125,26 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     emitStroke('stop');
   };
 
+  const handleTouchStart = (e) => {
+    if (!isExplainer) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    startDrawing({ clientX: touch.clientX, clientY: touch.clientY });
+  };
+
+  const handleTouchMove = (e) => {
+    if (!isExplainer) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    draw({ clientX: touch.clientX, clientY: touch.clientY });
+  };
+
+  const handleTouchEnd = (e) => {
+    if (!isExplainer) return;
+    e.preventDefault();
+    stopDrawing();
+  };
+
   return (
     <div
       ref={containerRef}
@@ -144,7 +164,11 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseOut={stopDrawing}
-        style={{ display: 'block', width: '100%', height: 'auto' }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{ display: 'block', width: '100%', height: 'auto', touchAction: 'none' }}
       />
 
       {!isExplainer && (

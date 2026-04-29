@@ -19,17 +19,12 @@ export default function Auth() {
 
   const passwordRules = [
     { label: 'Min 8 characters', met: password.length >= 8 },
-    { label: 'At least 1 uppercase', met: /[A-Z]/.test(password) },
-    { label: 'At least 1 lowercase', met: /[a-z]/.test(password) },
-    { label: 'At least 1 number', met: /[0-9]/.test(password) },
-    { label: 'At least 1 special char', met: /[!@#$%^&*]/.test(password) },
   ];
 
   const getPasswordStrength = () => {
-    const metCount = passwordRules.filter(r => r.met).length;
-    if (metCount <= 2) return { label: 'Weak', color: '#e05555' };
-    if (metCount <= 4) return { label: 'Medium', color: '#f5c842' };
-    return { label: 'Strong', color: '#e8f5e8' };
+    if (password.length >= 8) return { label: 'Strong', color: '#e8f5e8' };
+    if (password.length >= 4) return { label: 'Medium', color: '#f5c842' };
+    return { label: 'Weak', color: '#e05555' };
   };
 
   const handleSubmit = async (e) => {
@@ -46,8 +41,8 @@ export default function Auth() {
         setError('Only letters, numbers, and underscores allowed.');
         return;
       }
-      if (passwordRules.some(r => !r.met)) {
-        setError('Password does not meet all requirements.');
+      if (password.length < 8) {
+        setError('Password must be at least 8 characters.');
         return;
       }
     }
@@ -188,7 +183,7 @@ export default function Auth() {
                   </div>
                   <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
                     <motion.div
-                      animate={{ width: `${(passwordRules.filter(r => r.met).length / 5) * 100}%`, backgroundColor: getPasswordStrength().color }}
+                      animate={{ width: `${(passwordRules.filter(r => r.met).length / 1) * 100}%`, backgroundColor: getPasswordStrength().color }}
                       style={{ height: '100%' }}
                     />
                   </div>
