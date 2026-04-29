@@ -1,4 +1,4 @@
-const { getRandomTopic } = require('./topics');
+const { getRandomWord } = require('./topics');
 const { getRoom } = require('./rooms');
 
 const startNextRound = (io, roomId) => {
@@ -15,7 +15,7 @@ const startNextRound = (io, roomId) => {
 
   room.status = 'playing';
   room.timer = room.roundDuration || 90;
-  room.topic = getRandomTopic(room.subject);
+  room.topic = getRandomWord(room.subject, room.subtopic);
   room.roundScores = {}; // Reset scores for new round
   
   io.to(roomId).emit('room_state_update', room);

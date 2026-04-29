@@ -1,3 +1,5 @@
+const wordBank = require('./wordbank.json');
+
 const topics = {
   "Biology": [
     "Mitosis", "Photosynthesis", "Natural Selection", "The Immune System", "DNA Replication", 
@@ -33,4 +35,13 @@ const getRandomTopic = (subject) => {
   return { subject: chosenSubject, topic };
 };
 
-module.exports = { topics, getRandomTopic };
+const getRandomWord = (subject, subtopic) => {
+  const subjectData = wordBank[subject];
+  if (!subjectData) return { subject, subtopic, term: 'Unknown' };
+  const subtopicTerms = subjectData[subtopic];
+  if (!subtopicTerms || subtopicTerms.length === 0) return { subject, subtopic, term: 'Unknown' };
+  const term = subtopicTerms[Math.floor(Math.random() * subtopicTerms.length)];
+  return { subject, subtopic, term };
+};
+
+module.exports = { topics, getRandomTopic, wordBank, getRandomWord };

@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { AccessToken } = require('livekit-server-sdk');
 const { createRoom, getRoom, deleteRoom, getAllRooms } = require('./rooms');
 const { startNextRound, endRound } = require('./gameLoop');
+const { wordBank } = require('./topics');
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -50,7 +51,7 @@ const roomLimiter = rateLimit({
 });
 
 app.post('/rooms', roomLimiter, (req, res) => {
-  const { roomId, name, isPublic, maxPlayers, roundDuration, roundsPerPlayer, subject } = req.body;
+  const { roomId, name, isPublic, maxPlayers, roundDuration, roundsPerPlayer, subject, subtopic } = req.body;
   if (typeof roomId !== 'string' || !/^[A-Z0-9]{1,20}$/.test(roomId)) {
     return res.status(400).json({ error: 'Invalid roomId' });
   }
@@ -63,11 +64,20 @@ app.post('/rooms', roomLimiter, (req, res) => {
   const safeRoundsPerPlayer = Number.isInteger(roundsPerPlayer) && roundsPerPlayer >= 1 && roundsPerPlayer <= 5
     ? roundsPerPlayer : 1;
   const safeSubject = typeof subject === 'string' ? subject : null;
+  const safeSubtopic = typeof subtopic === 'string' ? subtopic : null;
 
   if (!getRoom(roomId)) {
-    createRoom(roomId, { name: safeName, isPublic: safePublic, maxPlayers: safeMax, roundDuration: safeRoundDuration, roundsPerPlayer: safeRoundsPerPlayer, subject: safeSubject });
+    createRoom(roomId, { name: safeName, isPublic: safePublic, maxPlayers: safeMax, roundDuration: safeRoundDuration, roundsPerPlayer: safeRoundsPerPlayer, subject: safeSubject, subtopic: safeSubtopic });
   }
   res.json({ roomId });
+});
+
+app.get('/subjects', (_req, res) => {
+  const structure = {};
+  Object.entries(wordBank).forEach(([subject, subtopics]) => {
+    structure[subject] = Object.keys(subtopics);
+  });
+  res.json(structure);
 });
 
 app.get('/rooms', (_req, res) => {

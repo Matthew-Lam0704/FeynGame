@@ -155,7 +155,7 @@ export default function Game() {
         {/* Center: topic */}
         <AnimatePresence mode="wait">
           <motion.div
-            key={roomState.topic?.topic}
+            key={roomState.topic?.term}
             initial={{ opacity: 0, y: -12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
@@ -163,13 +163,13 @@ export default function Game() {
             style={{ textAlign: 'center' }}
           >
             <div style={{ color: 'var(--text-dim)', fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.15em', marginBottom: '2px' }}>
-              {roomState.topic?.subject} — explain:
+              {roomState.topic?.subject} · {roomState.topic?.subtopic} — explain:
             </div>
             <div style={{
               fontFamily: 'var(--font-serif)', fontSize: '1.6rem', color: 'var(--accent-yellow)',
               fontWeight: 'bold', textShadow: '0 0 20px rgba(245,200,66,0.3)'
             }}>
-              {roomState.topic?.topic}
+              {roomState.topic?.term}
             </div>
           </motion.div>
         </AnimatePresence>

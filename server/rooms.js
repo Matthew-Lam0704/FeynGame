@@ -1,6 +1,6 @@
 const rooms = new Map();
 
-const createRoom = (roomId, { name = roomId, isPublic = false, maxPlayers = 4, roundDuration = 90, roundsPerPlayer = 1, subject = null } = {}) => {
+const createRoom = (roomId, { name = roomId, isPublic = false, maxPlayers = 4, roundDuration = 90, roundsPerPlayer = 1, subject = null, subtopic = null } = {}) => {
   const room = {
     id: roomId,
     name,
@@ -9,6 +9,7 @@ const createRoom = (roomId, { name = roomId, isPublic = false, maxPlayers = 4, r
     roundDuration,
     roundsPerPlayer,
     subject,
+    subtopic,
     players: [],
     status: 'lobby',
     currentRound: 0,

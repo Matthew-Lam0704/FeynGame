@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 
@@ -22,12 +22,27 @@ const chipBase = {
 
 export default function CreateRoomModal({ onClose }) {
   const [roomName, setRoomName] = useState('');
-  const [subject, setSubject] = useState('physics');
+  const [subjectStructure, setSubjectStructure] = useState({});
+  const [subject, setSubject] = useState('');
+  const [subtopic, setSubtopic] = useState('');
   const [isPublic, setIsPublic] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [roundDuration, setRoundDuration] = useState(90);
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(1);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const raw = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+    const serverUrl = raw.startsWith('http') ? raw : `https://${raw}`;
+    fetch(`${serverUrl}/subjects`)
+      .then(r => r.json())
+      .then(data => {
+        setSubjectStructure(data);
+        const firstSubject = Object.keys(data)[0];
+        setSubject(firstSubject);
+        setSubtopic(data[firstSubject][0]);
+      });
+  }, []);
 
   const handleCreate = async (e) => {
     e.preventDefault();
@@ -37,7 +52,7 @@ export default function CreateRoomModal({ onClose }) {
     await fetch(`${serverUrl}/rooms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ roomId: roomCode, name: roomName, isPublic, maxPlayers, roundDuration, roundsPerPlayer, subject }),
+      body: JSON.stringify({ roomId: roomCode, name: roomName, isPublic, maxPlayers, roundDuration, roundsPerPlayer, subject, subtopic }),
     });
     navigate(`/room/${roomCode}`);
   };
@@ -79,14 +94,23 @@ export default function CreateRoomModal({ onClose }) {
           {/* Subject */}
           <div>
             <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-dim)' }}>Subject</label>
-            <select value={subject} onChange={(e) => setSubject(e.target.value)} style={selectStyle}>
-              <option value="physics">Physics</option>
-              <option value="biology">Biology</option>
-              <option value="chemistry">Chemistry</option>
-              <option value="maths">Mathematics</option>
-              <option value="history">History</option>
-              <option value="economics">Economics</option>
-              <option value="custom">Custom (All Topics)</option>
+            <select value={subject} onChange={(e) => {
+              setSubject(e.target.value);
+              setSubtopic(subjectStructure[e.target.value][0]);
+            }} style={selectStyle}>
+              {Object.keys(subjectStructure).map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Subtopic */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-dim)' }}>Subtopic</label>
+            <select value={subtopic} onChange={(e) => setSubtopic(e.target.value)} style={selectStyle}>
+              {(subjectStructure[subject] || []).map(st => (
+                <option key={st} value={st}>{st}</option>
+              ))}
             </select>
           </div>
 
