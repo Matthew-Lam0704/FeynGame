@@ -21,6 +21,7 @@ const startNextRound = (io, roomId) => {
   room.timer = room.roundDuration || 90;
   room.topic = getRandomWord(room.subject, room.subtopic);
   room.roundScores = {}; // Reset scores for new round
+  room.textBoxes = []; // Clear textboxes for new round
   
   io.to(roomId).emit('room_state_update', room);
   io.to(roomId).emit('canvas_clear');

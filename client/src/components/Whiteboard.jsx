@@ -25,11 +25,10 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
 
   // Sync textboxes with roomState
   useEffect(() => {
-    if (roomState?.textBoxes) {
-      // Only update if there's a difference to avoid infinite re-renders or focus issues
-      if (JSON.stringify(roomState.textBoxes) !== JSON.stringify(textBoxes)) {
-        setTextBoxes(roomState.textBoxes);
-      }
+    const remoteBoxes = roomState?.textBoxes || [];
+    // Only update if there's a difference to avoid infinite re-renders or focus issues
+    if (JSON.stringify(remoteBoxes) !== JSON.stringify(textBoxes || [])) {
+      setTextBoxes(remoteBoxes);
     }
   }, [roomState?.textBoxes]);
 
@@ -252,7 +251,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
 
       {/* Text box overlay */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-        {textBoxes.map(tb => (
+        {(textBoxes || []).map(tb => (
           <div
             key={tb.id}
             style={{

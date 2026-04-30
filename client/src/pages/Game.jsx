@@ -79,7 +79,7 @@ export default function Game() {
   }
 
   if (roomState.status === 'between_rounds') {
-    const nextIndex = (roomState.currentExplainerIndex + 1) % roomState.players.length;
+    const nextIndex = (roomState.currentExplainerIndex + 1) % Math.max(1, roomState.players.length);
     return (
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
