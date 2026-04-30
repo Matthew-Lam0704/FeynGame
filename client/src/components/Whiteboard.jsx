@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 
-export default function Whiteboard({ isExplainer, color, size, tool, socket, roomId }) {
+export default function Whiteboard({ isExplainer, color, size, tool, socket, roomId, roomState }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
