@@ -102,7 +102,7 @@ export default function Lobby() {
                 marginBottom: '1rem', color: player.isReady ? '#1e2e1e' : 'var(--text-chalk)',
                 transition: 'all 0.3s ease'
               }}>
-                {player.name.charAt(0).toUpperCase()}
+                {player.name?.charAt(0).toUpperCase() || '?'}
               </div>
               <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem', color: 'var(--text-chalk)' }}>{player.name}</h3>
               

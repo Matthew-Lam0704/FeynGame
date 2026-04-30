@@ -90,7 +90,7 @@ export default function Game() {
         </h1>
         <div className="glass-panel" style={{ padding: '2rem', maxWidth: '500px', width: '90%' }}>
           <h2 style={{ marginBottom: '1rem' }}>Current Standings</h2>
-          {[...roomState.players].sort((a, b) => b.totalPoints - a.totalPoints).map((p, idx) => (
+          {[...(roomState.players || [])].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0)).map((p, idx) => (
             <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
               <span>{idx + 1}. {p.name}</span>
               <span style={{ color: 'var(--accent-yellow)' }}>{p.totalPoints.toFixed(1)} pts</span>
@@ -191,7 +191,7 @@ export default function Game() {
               color: p.id === explainer?.id ? 'black' : 'white',
               fontWeight: 'bold', position: 'relative'
             }} title={p.name}>
-              {p.name.charAt(0)}
+              {p.name?.charAt(0).toUpperCase() || '?'}
               {p.id === explainer?.id && (
                 <div className="mic-wave" style={{ position: 'absolute', bottom: '-4px', width: '100%', height: '4px', display: 'flex', gap: '2px', justifyContent: 'center' }}>
                   <div className="wave-bar" />
