@@ -5,7 +5,6 @@ import Lobby from './pages/Lobby'
 import Game from './pages/Game'
 import Results from './pages/Results'
 import Auth from './pages/Auth'
-import AvatarCreator from './pages/AvatarCreator'
 import { useUserStore } from './store/useUserStore'
 
 function RequireAuth({ children }) {
@@ -36,7 +35,6 @@ function App() {
     <Routes>
       <Route path="/auth" element={<Auth />} />
       <Route path="/" element={<RequireAuth><Home /></RequireAuth>} />
-      <Route path="/avatar-creator" element={<RequireAuth><AvatarCreator /></RequireAuth>} />
       <Route path="/room/:roomId" element={<RequireAuth><Lobby /></RequireAuth>} />
       <Route path="/game/:roomId" element={<RequireAuth><Game /></RequireAuth>} />
       <Route path="/results/:roomId" element={<RequireAuth><Results /></RequireAuth>} />

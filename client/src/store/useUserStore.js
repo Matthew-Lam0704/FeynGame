@@ -10,38 +10,75 @@ const loadTokens = (userId) =>
 const saveTokens = (userId, amount) =>
   localStorage.setItem(`coins_${userId}`, String(amount));
 
+const bootstrapNewUser = async (user) => {
+  if (user.user_metadata?.avatarUrl) return;
+  const username = derivePlayerName(user);
+  const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(username)}`;
+  await supabase.auth.updateUser({ data: { avatarUrl } });
+  const existing = parseInt(localStorage.getItem(`coins_${user.id}`) || '0', 10);
+  if (existing === 0) {
+    localStorage.setItem(`coins_${user.id}`, '240');
+  }
+};
+
 export const useUserStore = create((set, get) => ({
   user: null,
   profile: null,
+  isGuest: false,
   isLoading: true,
 
   setProfile: (profile) => set({ profile }),
 
   awardCoins: (amount) => {
-    const { user, profile } = get();
+    const { user, profile, isGuest } = get();
     if (!user?.id || amount <= 0) return;
     const current = profile?.tokens || 0;
     const newTotal = current + amount;
-    saveTokens(user.id, newTotal);
+    if (!isGuest) {
+      saveTokens(user.id, newTotal);
+    }
     set({ profile: { ...profile, tokens: newTotal } });
   },
 
+  loginAsGuest: () => {
+    const suffix = Math.random().toString(36).slice(2, 7);
+    const username = `Guest_${suffix}`;
+    const avatarUrl = `https://api.dicebear.com/7.x/bottts/svg?seed=${username}`;
+    const guestUser = {
+      id: `guest_${suffix}`,
+      user_metadata: { username },
+      email: null,
+    };
+    localStorage.setItem('playerName', username);
+    set({ user: guestUser, profile: { tokens: 0, avatarUrl }, isGuest: true, isLoading: false });
+  },
+
   initAuth: () => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const user = session?.user ?? null;
       if (user) {
+        await bootstrapNewUser(user);
         localStorage.setItem('playerName', derivePlayerName(user));
-        set({ user, profile: { tokens: loadTokens(user.id) }, isLoading: false });
+        const tokens = loadTokens(user.id);
+        const avatarUrl =
+          user.user_metadata?.avatarUrl ||
+          `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(derivePlayerName(user))}`;
+        set({ user, profile: { tokens, avatarUrl }, isLoading: false });
       } else {
         set({ user: null, profile: null, isLoading: false });
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const user = session?.user ?? null;
       if (user) {
+        await bootstrapNewUser(user);
         localStorage.setItem('playerName', derivePlayerName(user));
-        set({ user, profile: { tokens: loadTokens(user.id) }, isLoading: false });
+        const tokens = loadTokens(user.id);
+        const avatarUrl =
+          user.user_metadata?.avatarUrl ||
+          `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(derivePlayerName(user))}`;
+        set({ user, profile: { tokens, avatarUrl }, isLoading: false });
       } else {
         set({ user: null, profile: null, isLoading: false });
       }
@@ -51,8 +88,9 @@ export const useUserStore = create((set, get) => ({
   },
 
   logout: async () => {
-    await supabase.auth.signOut();
+    const { isGuest } = get();
+    if (!isGuest) await supabase.auth.signOut();
     localStorage.removeItem('playerName');
-    set({ user: null, profile: null });
+    set({ user: null, profile: null, isGuest: false });
   },
 }));

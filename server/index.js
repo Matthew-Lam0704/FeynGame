@@ -247,6 +247,28 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('textbox:add', ({ roomId, id, x, y, text }) => {
+    if (typeof roomId !== 'string') return;
+    if (typeof id !== 'string' || id.length > 20) return;
+    if (typeof x !== 'number' || x < 0 || x > 1) return;
+    if (typeof y !== 'number' || y < 0 || y > 1) return;
+    if (typeof text !== 'string') return;
+    io.to(roomId).emit('textbox:add', { id, x, y, text: text.slice(0, 500) });
+  });
+
+  socket.on('textbox:update', ({ roomId, id, text }) => {
+    if (typeof roomId !== 'string') return;
+    if (typeof id !== 'string' || id.length > 20) return;
+    if (typeof text !== 'string') return;
+    socket.to(roomId).emit('textbox:update', { id, text: text.slice(0, 500) });
+  });
+
+  socket.on('textbox:delete', ({ roomId, id }) => {
+    if (typeof roomId !== 'string') return;
+    if (typeof id !== 'string' || id.length > 20) return;
+    socket.to(roomId).emit('textbox:delete', { id });
+  });
+
   socket.on('submit_score', ({ roomId, score }) => {
     if (typeof roomId !== 'string') return;
     const validScore = Number(score);

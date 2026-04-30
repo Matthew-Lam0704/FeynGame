@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useUserStore } from '../store/useUserStore';
 
 export default function Auth() {
   const location = useLocation();
@@ -16,6 +17,12 @@ export default function Auth() {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const loginAsGuest = useUserStore((s) => s.loginAsGuest);
+
+  const handleGuestLogin = () => {
+    loginAsGuest();
+    navigate('/');
+  };
 
   const passwordRules = [
     { label: 'Min 8 characters', met: password.length >= 8 },
@@ -247,6 +254,24 @@ export default function Auth() {
             )}
           </motion.form>
         </AnimatePresence>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', margin: '1rem 0 0' }}>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(232, 245, 232, 0.1)' }} />
+          <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>OR</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(232, 245, 232, 0.1)' }} />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGuestLogin}
+          style={{
+            width: '100%', padding: '0.8rem', fontSize: '1rem', marginTop: '0.75rem',
+            color: 'var(--text-dim)', border: '1px solid rgba(232,245,232,0.2)',
+            borderRadius: '10px', background: 'transparent', cursor: 'pointer',
+          }}
+        >
+          Play as Guest (no account needed)
+        </button>
       </motion.div>
     </div>
   );

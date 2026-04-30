@@ -8,7 +8,7 @@ import SettingsModal from './SettingsModal';
 export default function ProfileHUD() {
   const [isOpen, setIsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const { user, profile, logout } = useUserStore();
+  const { user, profile, logout, isGuest } = useUserStore();
   const username = user?.user_metadata?.username || user?.email?.split('@')[0] || 'Player';
   const navigate = useNavigate();
 
@@ -53,7 +53,14 @@ export default function ProfileHUD() {
           <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         </div>
         <div style={{ textAlign: 'left' }}>
-          <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-chalk)' }}>{username}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-chalk)' }}>{username}</div>
+            {isGuest && (
+              <div style={{ fontSize: '0.6rem', color: '#1e2e1e', background: 'var(--accent-yellow)', padding: '1px 5px', borderRadius: '6px', fontWeight: 'bold', letterSpacing: '0.05em' }}>
+                GUEST
+              </div>
+            )}
+          </div>
           <div style={{ fontSize: '0.75rem', color: 'var(--accent-yellow)', display: 'flex', alignItems: 'center', gap: '4px' }}>
             <Coins size={12} /> {profile?.tokens || 0}
           </div>
@@ -95,7 +102,9 @@ export default function ProfileHUD() {
                   <img src={avatarUrl} alt="Large Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <h3 style={{ fontSize: '1.4rem', color: 'var(--text-chalk)' }}>{username}</h3>
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{user?.email}</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
+                  {isGuest ? 'Playing as guest — no account' : user?.email}
+                </p>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -109,7 +118,7 @@ export default function ProfileHUD() {
                   <span style={{ fontWeight: 'bold', color: 'var(--accent-yellow)' }}>{profile?.tokens || 0} 🪙</span>
                 </div>
 
-                <MenuButton icon={<Settings size={18} />} label="Settings" onClick={() => { setIsOpen(false); setSettingsOpen(true); }} />
+                <MenuButton icon={<Settings size={18} />} label="Settings" onClick={() => { setIsOpen(false); setSettingsOpen(true); }} disabled={isGuest} sublabel={isGuest ? 'Sign in to access' : undefined} />
                 <MenuButton icon={<LogOut size={18} />} label="Log out" onClick={handleLogout} color="var(--accent-red)" />
               </div>
             </motion.div>

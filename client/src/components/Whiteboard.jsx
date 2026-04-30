@@ -4,8 +4,9 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [textBoxes, setTextBoxes] = useState([]);
 
-  // All players listen for canvas_clear (explainer clears locally too)
+  // All players listen for canvas_clear (also clears text boxes)
   useEffect(() => {
     if (!socket) return;
 
@@ -15,10 +16,41 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       const ctx = canvas.getContext('2d');
       ctx.fillStyle = '#1e2e1e';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      setTextBoxes([]);
     };
 
     socket.on('canvas_clear', onCanvasClear);
     return () => socket.off('canvas_clear', onCanvasClear);
+  }, [socket]);
+
+  // All players listen for text box events
+  useEffect(() => {
+    if (!socket) return;
+
+    const onTextboxAdd = ({ id, x, y, text }) => {
+      setTextBoxes(prev => {
+        if (prev.find(tb => tb.id === id)) return prev;
+        return [...prev, { id, x, y, text }];
+      });
+    };
+
+    const onTextboxUpdate = ({ id, text }) => {
+      setTextBoxes(prev => prev.map(tb => tb.id === id ? { ...tb, text } : tb));
+    };
+
+    const onTextboxDelete = ({ id }) => {
+      setTextBoxes(prev => prev.filter(tb => tb.id !== id));
+    };
+
+    socket.on('textbox:add', onTextboxAdd);
+    socket.on('textbox:update', onTextboxUpdate);
+    socket.on('textbox:delete', onTextboxDelete);
+
+    return () => {
+      socket.off('textbox:add', onTextboxAdd);
+      socket.off('textbox:update', onTextboxUpdate);
+      socket.off('textbox:delete', onTextboxDelete);
+    };
   }, [socket]);
 
   // Viewers receive stroke replays
@@ -82,8 +114,37 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     });
   };
 
+  const handleTextChange = (id, newText) => {
+    setTextBoxes(prev => prev.map(tb => tb.id === id ? { ...tb, text: newText } : tb));
+    if (socket && roomId) {
+      socket.emit('textbox:update', { roomId, id, text: newText });
+    }
+  };
+
+  const handleTextDelete = (id) => {
+    setTextBoxes(prev => prev.filter(tb => tb.id !== id));
+    if (socket && roomId) {
+      socket.emit('textbox:delete', { roomId, id });
+    }
+  };
+
   const startDrawing = (e) => {
     if (!isExplainer) return;
+
+    if (tool === 'text') {
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) / canvas.width;
+      const y = (e.clientY - rect.top) / canvas.height;
+      const id = Math.random().toString(36).slice(2, 9);
+      const newBox = { id, x, y, text: '' };
+      setTextBoxes(prev => [...prev, newBox]);
+      if (socket && roomId) {
+        socket.emit('textbox:add', { roomId, id, x, y, text: '' });
+      }
+      return;
+    }
+
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
@@ -97,6 +158,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
   };
 
   const draw = (e) => {
+    if (tool === 'text') return;
     if (!isDrawing || !isExplainer) return;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -118,6 +180,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
   };
 
   const stopDrawing = () => {
+    if (tool === 'text') return;
     if (!isDrawing || !isExplainer) return;
     const ctx = canvasRef.current.getContext('2d');
     ctx.closePath();
@@ -155,7 +218,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
         overflow: 'hidden',
         boxShadow: 'var(--shadow-lg)',
         position: 'relative',
-        cursor: isExplainer ? 'crosshair' : 'default'
+        cursor: isExplainer ? (tool === 'text' ? 'text' : 'crosshair') : 'default',
       }}
     >
       <canvas
@@ -176,6 +239,75 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
           Viewing Mode
         </div>
       )}
+
+      {/* Text box overlay */}
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: isExplainer ? 'auto' : 'none' }}>
+        {textBoxes.map(tb => (
+          <div
+            key={tb.id}
+            style={{
+              position: 'absolute',
+              left: `${tb.x * 100}%`,
+              top: `${tb.y * 100}%`,
+              transform: 'translate(-2px, -2px)',
+              minWidth: '120px',
+              maxWidth: '300px',
+            }}
+          >
+            {isExplainer ? (
+              <div style={{ position: 'relative', display: 'inline-block' }}>
+                <button
+                  onMouseDown={(e) => { e.stopPropagation(); handleTextDelete(tb.id); }}
+                  style={{
+                    position: 'absolute', top: '-10px', right: '-10px',
+                    width: '20px', height: '20px', borderRadius: '50%',
+                    background: '#e05555', color: 'white',
+                    fontSize: '14px', lineHeight: 1,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: 'none', cursor: 'pointer', zIndex: 10,
+                  }}
+                >
+                  ×
+                </button>
+                <textarea
+                  autoFocus
+                  value={tb.text}
+                  onChange={(e) => handleTextChange(tb.id, e.target.value)}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  rows={2}
+                  style={{
+                    background: 'rgba(255,255,255,0.92)',
+                    color: '#1e2e1e',
+                    border: '2px solid rgba(30,46,30,0.7)',
+                    borderRadius: '6px',
+                    padding: '6px 8px',
+                    fontSize: '0.9rem',
+                    resize: 'both',
+                    minWidth: '120px',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+            ) : (
+              <div style={{
+                background: 'rgba(255,255,255,0.92)',
+                color: '#1e2e1e',
+                border: '2px solid rgba(30,46,30,0.5)',
+                borderRadius: '6px',
+                padding: '6px 8px',
+                fontSize: '0.9rem',
+                whiteSpace: 'pre-wrap',
+                minWidth: '120px',
+                maxWidth: '300px',
+              }}>
+                {tb.text || ' '}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

@@ -45,7 +45,14 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
 
     const roomPromise = connectToRoom();
     return () => {
-      roomPromise.then(r => { if (r) r.disconnect(); });
+      roomPromise.then(r => {
+        if (!r) return;
+        if (localTrackRef.current) {
+          localTrackRef.current.stop();
+          localTrackRef.current = null;
+        }
+        r.disconnect();
+      });
     };
   }, [roomId, playerName]);
 

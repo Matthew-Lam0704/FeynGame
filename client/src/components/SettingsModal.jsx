@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Volume2, Trash2, Mic, CheckCircle, AlertTriangle } from 'lucide-react';
+import { X, Volume2, Trash2, Mic, AlertTriangle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/useUserStore';
 import { supabase } from '../lib/supabase';
@@ -8,19 +8,15 @@ import { supabase } from '../lib/supabase';
 const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 // Guard against missing protocol (e.g. Vercel dashboard env var without https://)
 const SERVER_URL = rawServerUrl.startsWith('http') ? rawServerUrl : `https://${rawServerUrl}`;
-const RPM_URL = 'https://readyplayer.me/avatar?frameApi';
-
 const NAV = [
-  { id: 'avatar', Icon: User, label: 'Avatar' },
   { id: 'audio', Icon: Volume2, label: 'Audio' },
 ];
 
 export default function SettingsModal({ isOpen, onClose }) {
-  const [section, setSection] = useState('avatar');
+  const [section, setSection] = useState('audio');
   const [deleteStep, setDeleteStep] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
-  const [avatarSaved, setAvatarSaved] = useState(false);
 
   const [inputDevices, setInputDevices] = useState([]);
   const [outputDevices, setOutputDevices] = useState([]);
@@ -29,7 +25,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [volume, setVolume] = useState(() => parseInt(localStorage.getItem('masterVolume') || '80', 10));
   const [audioPermissionDenied, setAudioPermissionDenied] = useState(false);
 
-  const { user, profile, setProfile, logout } = useUserStore();
+  const { user, profile, logout } = useUserStore();
   const navigate = useNavigate();
 
   const username = user?.user_metadata?.username || user?.email?.split('@')[0] || 'Player';
@@ -41,7 +37,10 @@ export default function SettingsModal({ isOpen, onClose }) {
     setAudioPermissionDenied(false);
 
     navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(() => navigator.mediaDevices.enumerateDevices())
+      .then((stream) => {
+        stream.getTracks().forEach(track => track.stop());
+        return navigator.mediaDevices.enumerateDevices();
+      })
       .then(devices => {
         setInputDevices(devices.filter(d => d.kind === 'audioinput'));
         setOutputDevices(devices.filter(d => d.kind === 'audiooutput'));
@@ -64,23 +63,6 @@ export default function SettingsModal({ isOpen, onClose }) {
     localStorage.setItem('masterVolume', String(val));
     document.querySelectorAll('audio, video').forEach(el => { el.volume = val / 100; });
   };
-
-  const handleRPMMessage = useCallback((event) => {
-    const url = event.data;
-    if (typeof url === 'string' && url.includes('.glb')) {
-      // Use portrait (.png) for 2D display; keep .glb for 3D
-      const portraitUrl = url.replace('.glb', '.png');
-      setProfile({ ...(profile || {}), avatarUrl: portraitUrl, avatarGlbUrl: url });
-      setAvatarSaved(true);
-      setTimeout(() => setAvatarSaved(false), 3000);
-    }
-  }, [profile, setProfile]);
-
-  useEffect(() => {
-    if (section !== 'avatar' || !isOpen) return;
-    window.addEventListener('message', handleRPMMessage);
-    return () => window.removeEventListener('message', handleRPMMessage);
-  }, [section, isOpen, handleRPMMessage]);
 
   // Reset delete step when switching sections
   useEffect(() => { setDeleteStep(0); setDeleteError(''); }, [section]);
@@ -182,26 +164,6 @@ export default function SettingsModal({ isOpen, onClose }) {
                 <X size={20} />
               </button>
 
-              {/* Avatar saved toast */}
-              <AnimatePresence>
-                {avatarSaved && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    style={{
-                      position: 'absolute', top: '1rem', left: '50%', transform: 'translateX(-50%)',
-                      background: 'rgba(50,100,50,0.9)', border: '1px solid rgba(232,245,232,0.2)',
-                      borderRadius: '40px', padding: '0.5rem 1.2rem',
-                      display: 'flex', alignItems: 'center', gap: '0.5rem',
-                      color: 'var(--text-chalk)', fontSize: '0.85rem', zIndex: 10,
-                    }}
-                  >
-                    <CheckCircle size={16} color="var(--accent-yellow)" /> Avatar saved!
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
               <AnimatePresence mode="wait">
                 <motion.div
                   key={section}
@@ -211,7 +173,6 @@ export default function SettingsModal({ isOpen, onClose }) {
                   transition={{ duration: 0.15 }}
                   style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '2.5rem', height: '100%' }}
                 >
-                  {section === 'avatar' && <AvatarSection />}
                   {section === 'audio' && (
                     <AudioSection
                       inputDevices={inputDevices}
@@ -269,43 +230,6 @@ function SidebarItem({ Icon, label, active, onClick, danger = false }) {
         <div style={{ width: '3px', height: '14px', background: 'var(--accent-yellow)', borderRadius: '2px', marginLeft: 'auto' }} />
       )}
     </motion.button>
-  );
-}
-
-/* ── Avatar Section ── */
-function AvatarSection() {
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <h2 style={{ fontSize: '1.4rem', color: 'var(--text-chalk)', marginBottom: '0.4rem' }}>Avatar</h2>
-      <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem', marginBottom: '1.25rem' }}>
-        Customize your avatar. Click <strong style={{ color: 'var(--text-chalk)' }}>Save</strong> inside the creator to apply it.
-      </p>
-
-      <div style={{
-        flex: 1, minHeight: 0, borderRadius: '16px', overflow: 'hidden',
-        border: '1px solid rgba(232,245,232,0.1)', position: 'relative',
-        background: 'var(--bg-dark)',
-      }}>
-        {!isLoaded && (
-          <div style={{
-            position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center', gap: '1rem',
-          }}>
-            <div className="spinner" />
-            <p style={{ color: 'var(--text-dim)', fontSize: '0.8rem', fontFamily: 'var(--font-mono)' }}>LOADING AVATAR CREATOR...</p>
-          </div>
-        )}
-        <iframe
-          src={RPM_URL}
-          onLoad={() => setIsLoaded(true)}
-          style={{ width: '100%', height: '100%', border: 'none', opacity: isLoaded ? 1 : 0, transition: 'opacity 0.3s' }}
-          allow="camera; microphone; clipboard-write"
-          title="Avatar Creator"
-        />
-      </div>
-    </div>
   );
 }
 

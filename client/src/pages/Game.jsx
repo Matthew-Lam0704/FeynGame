@@ -5,7 +5,7 @@ import Whiteboard from '../components/Whiteboard';
 import { useSocket } from '../hooks/useSocket';
 import { useAudio } from '../hooks/useAudio';
 import { useSounds } from '../hooks/useSounds';
-import { Pen, Eraser, Trash2, Clock, Mic, MicOff, CheckCircle } from 'lucide-react';
+import { Pen, Eraser, Trash2, Clock, Mic, MicOff, CheckCircle, Type } from 'lucide-react';
 
 export default function Game() {
   const { roomId } = useParams();
@@ -19,8 +19,9 @@ export default function Game() {
   const explainer = roomState?.players[explainerIndex];
   const isExplainer = socket?.id === explainer?.id;
   const [micActive, setMicActive] = useState(true);
+  const isBetweenRounds = roomState?.status === 'between_rounds';
 
-  useAudio(roomId, playerName, isExplainer, micActive);
+  useAudio(roomId, playerName, isExplainer && !isBetweenRounds, micActive);
 
   const [timeRemaining, setTimeRemaining] = useState(90);
   const [transitionTime, setTransitionTime] = useState(5);
@@ -280,6 +281,13 @@ export default function Game() {
               style={{ padding: '12px', background: tool === 'eraser' ? 'rgba(255, 255, 255, 0.1)' : 'transparent', borderRadius: '12px' }}
             >
               <Eraser size={28} color={tool === 'eraser' ? 'var(--accent-yellow)' : 'var(--text-chalk)'} />
+            </button>
+            <button
+              onClick={() => setTool('text')}
+              className={`tool-btn ${tool === 'text' ? 'active' : ''}`}
+              style={{ padding: '12px', background: tool === 'text' ? 'rgba(85, 153, 224, 0.15)' : 'transparent', borderRadius: '12px' }}
+            >
+              <Type size={28} color={tool === 'text' ? '#5599e0' : 'var(--text-chalk)'} />
             </button>
             <button
               onClick={() => { if (socket && roomId) socket.emit('stroke:clear', { roomId }); }}
