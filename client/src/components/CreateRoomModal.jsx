@@ -21,7 +21,7 @@ const DURATION_OPTIONS = [
 
 const selectStyle = {
   width: '100%', padding: '0.8rem', borderRadius: '6px', border: 'var(--border-chalk)',
-  background: 'var(--bg-dark)', color: 'var(--text-chalk)', fontSize: '1rem'
+  backgroundColor: 'var(--bg-dark)', color: 'var(--text-chalk)', fontSize: '1rem'
 };
 
 const chipBase = {

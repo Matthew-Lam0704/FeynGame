@@ -441,7 +441,7 @@ function Row({ label, value }) {
 
 const selectStyle = {
   width: '100%', padding: '0.7rem 1rem',
-  background: 'rgba(255,255,255,0.04)',
+  backgroundColor: 'rgba(255,255,255,0.04)',
   border: '1px solid rgba(232,245,232,0.15)',
   borderRadius: '10px', color: 'var(--text-chalk)',
   fontSize: '0.9rem', outline: 'none', cursor: 'pointer',
