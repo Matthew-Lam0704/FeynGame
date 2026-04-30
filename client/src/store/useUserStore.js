@@ -57,7 +57,7 @@ export const useUserStore = create((set, get) => ({
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       const user = session?.user ?? null;
       if (user) {
-        await bootstrapNewUser(user);
+        try { await bootstrapNewUser(user); } catch (_) { /* non-fatal */ }
         localStorage.setItem('playerName', derivePlayerName(user));
         const tokens = loadTokens(user.id);
         const avatarUrl =
@@ -67,12 +67,14 @@ export const useUserStore = create((set, get) => ({
       } else {
         set({ user: null, profile: null, isLoading: false });
       }
+    }).catch(() => {
+      set({ user: null, profile: null, isLoading: false });
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const user = session?.user ?? null;
       if (user) {
-        await bootstrapNewUser(user);
+        try { await bootstrapNewUser(user); } catch (_) { /* non-fatal */ }
         localStorage.setItem('playerName', derivePlayerName(user));
         const tokens = loadTokens(user.id);
         const avatarUrl =
