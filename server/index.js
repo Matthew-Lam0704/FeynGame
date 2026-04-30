@@ -87,6 +87,7 @@ app.post('/rooms', roomLimiter, (req, res) => {
     room.subject = safeSubject;
     room.subtopic = safeSubtopic;
     room.timer = safeRoundDuration;
+    console.log(`[ROOM UPDATE] Room: ${roomId}, Duration: ${room.roundDuration}, Subject: ${room.subject}`);
     io.to(roomId).emit('room_state_update', room);
   }
   res.json({ roomId });
@@ -226,6 +227,7 @@ io.on('connection', (socket) => {
     if (typeof roomId !== 'string') return;
     const room = getRoom(roomId);
     if (room && room.players.find(p => p.id === socket.id)?.isHost) {
+      console.log(`[START GAME] Room: ${roomId}, Duration: ${room.roundDuration}, Subject: ${room.subject}`);
       room.currentExplainerIndex = -1;
       room.totalRounds = room.players.length * (room.roundsPerPlayer || 1);
       startNextRound(io, roomId);
@@ -237,6 +239,7 @@ io.on('connection', (socket) => {
     const room = getRoom(roomId);
     if (room && room.status === 'playing') {
       const explainer = room.players[room.currentExplainerIndex % room.players.length];
+      console.log(`[END TURN] Room: ${roomId}, Explainer: ${explainer?.name}, Requester: ${socket.id}`);
       if (explainer && explainer.id === socket.id) {
         endRound(io, roomId);
       }
@@ -261,23 +264,38 @@ io.on('connection', (socket) => {
 
   socket.on('textbox:add', ({ roomId, id, x, y, text }) => {
     if (typeof roomId !== 'string') return;
-    if (typeof id !== 'string' || id.length > 20) return;
-    if (typeof x !== 'number' || x < 0 || x > 1) return;
-    if (typeof y !== 'number' || y < 0 || y > 1) return;
-    if (typeof text !== 'string') return;
-    io.to(roomId).emit('textbox:add', { id, x, y, text: text.slice(0, 500) });
+    const room = getRoom(roomId);
+    if (!room) return;
+
+    const newBox = { id, x, y, text: text.slice(0, 500) };
+    room.textBoxes = room.textBoxes || [];
+    room.textBoxes.push(newBox);
+    
+    io.to(roomId).emit('room_state_update', room);
+    io.to(roomId).emit('textbox:add', newBox);
   });
 
   socket.on('textbox:update', ({ roomId, id, text }) => {
     if (typeof roomId !== 'string') return;
-    if (typeof id !== 'string' || id.length > 20) return;
-    if (typeof text !== 'string') return;
+    const room = getRoom(roomId);
+    if (!room) return;
+
+    room.textBoxes = (room.textBoxes || []).map(tb => 
+      tb.id === id ? { ...tb, text: text.slice(0, 500) } : tb
+    );
+    
+    io.to(roomId).emit('room_state_update', room);
     socket.to(roomId).emit('textbox:update', { id, text: text.slice(0, 500) });
   });
 
   socket.on('textbox:delete', ({ roomId, id }) => {
     if (typeof roomId !== 'string') return;
-    if (typeof id !== 'string' || id.length > 20) return;
+    const room = getRoom(roomId);
+    if (!room) return;
+
+    room.textBoxes = (room.textBoxes || []).filter(tb => tb.id !== id);
+    
+    io.to(roomId).emit('room_state_update', room);
     socket.to(roomId).emit('textbox:delete', { id });
   });
 

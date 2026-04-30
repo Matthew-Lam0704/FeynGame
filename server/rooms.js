@@ -17,7 +17,8 @@ const createRoom = (roomId, { name = roomId, isPublic = false, maxPlayers = 4, r
     currentExplainerIndex: -1,
     timer: roundDuration,
     topic: null,
-    roundScores: {}
+    roundScores: {},
+    textBoxes: []
   };
   rooms.set(roomId, room);
   return room;

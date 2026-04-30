@@ -23,6 +23,16 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     return () => socket.off('canvas_clear', onCanvasClear);
   }, [socket]);
 
+  // Sync textboxes with roomState
+  useEffect(() => {
+    if (roomState?.textBoxes) {
+      // Only update if there's a difference to avoid infinite re-renders or focus issues
+      if (JSON.stringify(roomState.textBoxes) !== JSON.stringify(textBoxes)) {
+        setTextBoxes(roomState.textBoxes);
+      }
+    }
+  }, [roomState?.textBoxes]);
+
   // All players listen for text box events
   useEffect(() => {
     if (!socket) return;

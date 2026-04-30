@@ -6,6 +6,10 @@ const startNextRound = (io, roomId) => {
   if (!room) return;
 
   room.currentExplainerIndex++;
+  const explainerIndex = room.currentExplainerIndex % room.players.length;
+  const explainer = room.players[explainerIndex];
+
+  console.log(`[ROUND START] Room: ${roomId}, Round: ${room.currentExplainerIndex + 1}/${room.totalRounds}, Explainer: ${explainer?.name}, Duration: ${room.roundDuration}`);
 
   if (room.currentExplainerIndex >= (room.totalRounds || room.players.length)) {
     room.status = 'results';

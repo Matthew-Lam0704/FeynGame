@@ -1,49 +1,21 @@
 const wordBank = require('./wordbank.json');
 
-const topics = {
-  "Biology": [
-    "Mitosis", "Photosynthesis", "Natural Selection", "The Immune System", "DNA Replication", 
-    "Cellular Respiration", "Enzymes", "Protein Synthesis", "Homeostasis", "Meiosis"
-  ],
-  "Chemistry": [
-    "Covalent Bonds", "Oxidation", "Le Chatelier's Principle", "Electron Configuration",
-    "Ionic Bonding", "The Periodic Table", "Acids and Bases", "Reaction Rates", "Thermodynamics"
-  ],
-  "Physics": [
-    "Newton's Third Law", "Wave-Particle Duality", "Entropy", "Electromagnetic Induction",
-    "Special Relativity", "Quantum Tunneling", "Gravity", "Thermodynamics", "Nuclear Fusion"
-  ],
-  "Maths": [
-    "The Chain Rule", "Proof by Contradiction", "Eigenvectors", "Integration by Parts",
-    "Pythagorean Theorem", "The Golden Ratio", "Probability", "Matrices", "Complex Numbers"
-  ],
-  "History": [
-    "The Cold War", "The French Revolution", "Causes of WW1", "The Industrial Revolution",
-    "The Renaissance", "The Roman Empire", "The Civil Rights Movement"
-  ],
-  "Economics": [
-    "Supply and Demand", "Game Theory", "Comparative Advantage", "Inflation",
-    "Opportunity Cost", "Monopoly vs Competition", "Fiscal Policy"
-  ]
-};
-
-const getRandomTopic = (subject) => {
-  const categories = Object.keys(topics);
-  const chosenSubject = subject && topics[subject] ? subject : categories[Math.floor(Math.random() * categories.length)];
-  const subjectTopics = topics[chosenSubject];
-  const topic = subjectTopics[Math.floor(Math.random() * subjectTopics.length)];
-  return { subject: chosenSubject, topic };
-};
+// Removed hardcoded topics object to prevent confusion with wordbank.json
 
 const getRandomWord = (subject, subtopic) => {
   let finalSubject = subject;
   let finalSubtopic = subtopic;
 
-  // Fallback to random subject only if none provided or invalid
+  // Fallback to random subject ONLY if none provided. If invalid provided, try to find it.
   if (!finalSubject || !wordBank[finalSubject]) {
     const subjects = Object.keys(wordBank);
+    if (finalSubject && !wordBank[finalSubject]) {
+       console.warn(`[TOPIC WARN] Requested subject "${finalSubject}" not in wordBank. Available: ${subjects.join(', ')}`);
+    }
     finalSubject = subjects.includes(subject) ? subject : subjects[Math.floor(Math.random() * subjects.length)];
   }
+
+  console.log(`[TOPIC SELECTION] Subject: ${finalSubject}, Subtopic: ${finalSubtopic}`);
 
   const subjectData = wordBank[finalSubject];
   const subtopicKeys = Object.keys(subjectData);
@@ -69,7 +41,8 @@ const getRandomWord = (subject, subtopic) => {
   }
 
   const term = subtopicTerms[Math.floor(Math.random() * subtopicTerms.length)];
+  console.log(`[TOPIC SELECTED] ${term} (${finalSubject} > ${finalSubtopic})`);
   return { subject: finalSubject, subtopic: finalSubtopic, term };
 };
 
-module.exports = { topics, getRandomTopic, wordBank, getRandomWord };
+module.exports = { wordBank, getRandomWord };
