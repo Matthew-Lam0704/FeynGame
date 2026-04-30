@@ -55,23 +55,36 @@ export default function Auth() {
     }
 
     setIsSubmitting(true);
+    console.log('Submitting login/signup...', { isLogin, email });
     try {
       if (isLogin) {
+        console.log('Calling signInWithPassword...');
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-        if (authError) throw authError;
+        if (authError) {
+          console.error('Login error:', authError);
+          throw authError;
+        }
+        console.log('Login successful, navigating home...');
         navigate('/');
       } else {
+        console.log('Calling signUp...');
         const { error: authError } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { username } },
         });
-        if (authError) throw authError;
+        if (authError) {
+          console.error('Signup error:', authError);
+          throw authError;
+        }
+        console.log('Signup successful, check email');
         setSuccessMsg('Check your email to confirm your account, then log in.');
       }
     } catch (err) {
+      console.error('Form submission caught error:', err);
       setError(err.message);
     } finally {
+      console.log('Form submission finished, setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };

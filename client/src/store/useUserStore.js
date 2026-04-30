@@ -66,7 +66,8 @@ export const useUserStore = create((set, get) => ({
       clearTimeout(timeout);
       const user = session?.user ?? null;
       if (user) {
-        try { await bootstrapNewUser(user); } catch (_) { /* non-fatal */ }
+        console.log('Session retrieved successfully:', user.id);
+        bootstrapNewUser(user).catch(err => console.error('Non-fatal bootstrap error:', err));
         localStorage.setItem('playerName', derivePlayerName(user));
         const tokens = loadTokens(user.id);
         const avatarUrl =
@@ -74,16 +75,19 @@ export const useUserStore = create((set, get) => ({
           `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(derivePlayerName(user))}`;
         set({ user, profile: { tokens, avatarUrl }, isLoading: false });
       } else {
+        console.log('No active session found');
         set({ user: null, profile: null, isLoading: false });
       }
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('getSession error:', err);
       set({ user: null, profile: null, isLoading: false });
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const user = session?.user ?? null;
+      console.log('Auth state changed:', _event, user?.id);
       if (user) {
-        try { await bootstrapNewUser(user); } catch (_) { /* non-fatal */ }
+        bootstrapNewUser(user).catch(err => console.error('Non-fatal bootstrap error:', err));
         localStorage.setItem('playerName', derivePlayerName(user));
         const tokens = loadTokens(user.id);
         const avatarUrl =
