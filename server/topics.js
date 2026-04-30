@@ -3,46 +3,31 @@ const wordBank = require('./wordbank.json');
 // Removed hardcoded topics object to prevent confusion with wordbank.json
 
 const getRandomWord = (subject, subtopic) => {
-  let finalSubject = subject;
-  let finalSubtopic = subtopic;
-
-  // Fallback to random subject ONLY if none provided. If invalid provided, try to find it.
-  if (!finalSubject || !wordBank[finalSubject]) {
+  if (!subject || !wordBank[subject]) {
+    console.error(`[TOPIC ERROR] Unknown subject: "${subject}"`);
     const subjects = Object.keys(wordBank);
-    if (finalSubject && !wordBank[finalSubject]) {
-       console.warn(`[TOPIC WARN] Requested subject "${finalSubject}" not in wordBank. Available: ${subjects.join(', ')}`);
-    }
-    finalSubject = subjects.includes(subject) ? subject : subjects[Math.floor(Math.random() * subjects.length)];
+    const fallbackSubject = subjects[Math.floor(Math.random() * subjects.length)];
+    const subtopics = Object.keys(wordBank[fallbackSubject]);
+    const fallbackSubtopic = subtopics[Math.floor(Math.random() * subtopics.length)];
+    const terms = wordBank[fallbackSubject][fallbackSubtopic];
+    const term = terms[Math.floor(Math.random() * terms.length)];
+    return { subject: fallbackSubject, subtopic: fallbackSubtopic, term };
   }
-
-  console.log(`[TOPIC SELECTION] Subject: ${finalSubject}, Subtopic: ${finalSubtopic}`);
-
-  const subjectData = wordBank[finalSubject];
-  const subtopicKeys = Object.keys(subjectData);
-
-  // Robust subtopic matching
-  if (!finalSubtopic || !subjectData[finalSubtopic]) {
-    // Try fuzzy match (e.g. "Group 7" matches "Group 7 Halogens")
-    const fuzzyMatch = subtopicKeys.find(key => 
-      finalSubtopic && (key.toLowerCase().includes(finalSubtopic.toLowerCase()) || 
-      finalSubtopic.toLowerCase().includes(key.toLowerCase()))
-    );
-    
-    if (fuzzyMatch) {
-      finalSubtopic = fuzzyMatch;
-    } else {
-      finalSubtopic = subtopicKeys[Math.floor(Math.random() * subtopicKeys.length)];
-    }
+  
+  const subjectData = wordBank[subject];
+  if (!subtopic || !subjectData[subtopic]) {
+    console.warn(`[TOPIC WARN] Unknown subtopic: "${subtopic}" in "${subject}". Picking random subtopic.`);
+    const subtopics = Object.keys(subjectData);
+    const fallbackSubtopic = subtopics[Math.floor(Math.random() * subtopics.length)];
+    const terms = subjectData[fallbackSubtopic];
+    const term = terms[Math.floor(Math.random() * terms.length)];
+    return { subject, subtopic: fallbackSubtopic, term };
   }
-
-  const subtopicTerms = subjectData[finalSubtopic];
-  if (!subtopicTerms || subtopicTerms.length === 0) {
-    return { subject: finalSubject, subtopic: finalSubtopic, term: 'Unknown' };
-  }
-
-  const term = subtopicTerms[Math.floor(Math.random() * subtopicTerms.length)];
-  console.log(`[TOPIC SELECTED] ${term} (${finalSubject} > ${finalSubtopic})`);
-  return { subject: finalSubject, subtopic: finalSubtopic, term };
+  
+  const terms = subjectData[subtopic];
+  const term = terms[Math.floor(Math.random() * terms.length)];
+  console.log(`[TOPIC] ${term} (${subject} > ${subtopic})`);
+  return { subject, subtopic, term };
 };
 
 module.exports = { wordBank, getRandomWord };

@@ -40,8 +40,8 @@ export default function Auth() {
     setSuccessMsg('');
 
     if (!isLogin) {
-      if (username.length < 8 || username.length > 20) {
-        setError('Username must be 8-20 characters.');
+      if (username.length < 3 || username.length > 20) {
+        setError('Username must be 3-20 characters.');
         return;
       }
       if (!/^[a-zA-Z0-9_]+$/.test(username)) {

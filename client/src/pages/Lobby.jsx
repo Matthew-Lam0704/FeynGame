@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Copy, CheckCircle, Circle, Play, User } from 'lucide-react';
+import { Copy, CheckCircle, Circle, Play, User, Clock, RotateCcw, BookOpen, Globe, Lock, Settings } from 'lucide-react';
 import { useSocket } from '../hooks/useSocket';
 
 export default function Lobby() {
@@ -8,8 +8,18 @@ export default function Lobby() {
   const navigate = useNavigate();
   const [playerName] = useState(localStorage.getItem('playerName') || `Player ${Math.floor(Math.random() * 1000)}`);
   
-  const { roomState, isConnected, socketId, toggleReady, startGame } = useSocket(roomId, playerName);
+  const { roomState, isConnected, socketId, toggleReady, startGame, socket } = useSocket(roomId, playerName);
   const [isCopied, setIsCopied] = useState(false);
+  const [subjects, setSubjects] = useState({});
+
+  useEffect(() => {
+    const raw = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
+    const serverUrl = raw.startsWith('http') ? raw : `https://${raw}`;
+    fetch(`${serverUrl}/subjects`)
+      .then(r => r.json())
+      .then(setSubjects)
+      .catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (roomState?.status === 'playing') {
@@ -131,6 +141,106 @@ export default function Lobby() {
                 <User size={48} strokeWidth={1} />
               </div>
               <span style={{ color: 'rgba(232, 245, 232, 0.3)', fontStyle: 'italic', fontSize: '0.9rem' }}>Waiting for players...</span>
+            </div>
+          )}
+        </div>
+
+        {/* Room Info/Settings Widget */}
+        <div className="glass-panel" style={{ 
+          padding: '1.5rem', marginBottom: '4rem', display: 'flex', flexDirection: 'column', gap: '1.5rem',
+          border: '1px solid rgba(232, 245, 232, 0.15)'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '1.5rem', color: 'var(--text-dim)', fontSize: '0.95rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Clock size={18} color="var(--accent-yellow)" />
+                <span style={{ color: 'var(--text-chalk)', fontWeight: 'bold' }}>{roomState.roundDuration}s</span> per turn
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <RotateCcw size={18} color="var(--accent-blue)" />
+                <span style={{ color: 'var(--text-chalk)', fontWeight: 'bold' }}>{roomState.roundsPerPlayer}</span> rounds
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <BookOpen size={18} color="var(--accent-red)" />
+                <span style={{ color: 'var(--text-chalk)', fontWeight: 'bold' }}>{roomState.subject}</span>
+                {roomState.subtopic && <span style={{ opacity: 0.7 }}>› {roomState.subtopic}</span>}
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.5rem 1rem', borderRadius: '30px', border: '1px solid rgba(255,255,255,0.1)' }}>
+              {roomState.isPublic ? <Globe size={16} color="var(--accent-blue)" /> : <Lock size={16} color="var(--text-dim)" />}
+              <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: roomState.isPublic ? 'var(--accent-blue)' : 'var(--text-dim)' }}>
+                {roomState.isPublic ? 'PUBLIC ROOM' : 'PRIVATE ROOM'}
+              </span>
+            </div>
+          </div>
+
+          {/* Host Controls */}
+          {me?.isHost && (
+            <div style={{ borderTop: '1px solid rgba(232, 245, 232, 0.1)', paddingTop: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--accent-yellow)', fontSize: '0.9rem', fontWeight: 'bold', textTransform: 'uppercase' }}>
+                <Settings size={16} />
+                Host Settings
+              </div>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
+                <div className="input-group">
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Subject</label>
+                  <select 
+                    value={roomState.subject || ''} 
+                    onChange={(e) => socket.emit('update_room_settings', { roomId, subject: e.target.value, subtopic: subjects[e.target.value]?.[0] || '' })}
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '0.6rem', borderRadius: '8px', color: 'white' }}
+                  >
+                    {Object.keys(subjects).map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                
+                <div className="input-group">
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Subtopic</label>
+                  <select 
+                    value={roomState.subtopic || ''} 
+                    onChange={(e) => socket.emit('update_room_settings', { roomId, subtopic: e.target.value })}
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '0.6rem', borderRadius: '8px', color: 'white' }}
+                  >
+                    {(subjects[roomState.subject] || []).map(st => <option key={st} value={st}>{st}</option>)}
+                  </select>
+                </div>
+
+                <div className="input-group">
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Turn Duration</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {[30, 60, 90, 120].map(d => (
+                      <button 
+                        key={d} 
+                        onClick={() => socket.emit('update_room_settings', { roomId, roundDuration: d })}
+                        style={{ 
+                          flex: 1, padding: '0.4rem', borderRadius: '6px', fontSize: '0.8rem',
+                          background: roomState.roundDuration === d ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.05)',
+                          color: roomState.roundDuration === d ? 'black' : 'white',
+                          border: '1px solid rgba(255,255,255,0.1)'
+                        }}
+                      >
+                        {d}s
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="input-group">
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Visibility</label>
+                  <button 
+                    onClick={() => socket.emit('update_room_visibility', { roomId, isPublic: !roomState.isPublic })}
+                    style={{ 
+                      width: '100%', padding: '0.6rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold',
+                      background: roomState.isPublic ? 'rgba(85, 153, 224, 0.15)' : 'rgba(255,255,255,0.05)',
+                      color: roomState.isPublic ? 'var(--accent-blue)' : 'var(--text-dim)',
+                      border: roomState.isPublic ? '1px solid var(--accent-blue)' : '1px solid rgba(255,255,255,0.1)'
+                    }}
+                  >
+                    Set to {roomState.isPublic ? 'Private' : 'Public'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>

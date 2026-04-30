@@ -35,6 +35,25 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
 
         newRoom.on(RoomEvent.ParticipantConnected, updateParticipants);
         newRoom.on(RoomEvent.ParticipantDisconnected, updateParticipants);
+        
+        // Handle incoming audio from remote participants
+        newRoom.on(RoomEvent.TrackSubscribed, (track) => {
+          if (track.kind === 'audio') {
+            const audioEl = track.attach();
+            audioEl.setAttribute('data-livekit', 'true');
+            document.body.appendChild(audioEl);
+          }
+        });
+        
+        newRoom.on(RoomEvent.TrackUnsubscribed, (track) => {
+          track.detach().forEach(el => el.remove());
+        });
+
+        // Prompt the browser mic dialog at game load so it doesn't interrupt gameplay
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(stream => stream.getTracks().forEach(t => t.stop()))
+          .catch(() => {});
+
         updateParticipants();
 
         return newRoom;
@@ -51,6 +70,7 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
           localTrackRef.current.stop();
           localTrackRef.current = null;
         }
+        document.querySelectorAll('audio[data-livekit]').forEach(el => el.remove());
         r.disconnect();
       });
     };

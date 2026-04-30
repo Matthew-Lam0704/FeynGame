@@ -7,6 +7,8 @@ const { AccessToken } = require('livekit-server-sdk');
 const { createRoom, getRoom, deleteRoom, getAllRooms } = require('./rooms');
 const { startNextRound, endRound } = require('./gameLoop');
 const { wordBank } = require('./topics');
+const filter = require('leo-profanity');
+filter.loadDictionary('en');
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -110,6 +112,8 @@ app.get('/rooms', (_req, res) => {
         name: room.name,
         players: room.players.length,
         maxPlayers: room.maxPlayers,
+        subject: room.subject,
+        subtopic: room.subtopic,
       });
     }
   });
@@ -182,9 +186,10 @@ app.get('/token', tokenLimiter, async (req, res) => {
 io.on('connection', (socket) => {
   socket.on('join_room', ({ roomId, playerName }) => {
     if (typeof roomId !== 'string' || roomId.length > 20) return;
-    const safeName = typeof playerName === 'string'
+    let safeName = typeof playerName === 'string'
       ? playerName.slice(0, 30).trim() || 'Anonymous'
       : 'Anonymous';
+    safeName = filter.clean(safeName);
 
     socket.join(roomId);
 
@@ -234,14 +239,57 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('end_turn', ({ roomId }) => {
+  socket.on('update_room_visibility', ({ roomId, isPublic }) => {
+    if (typeof roomId !== 'string') return;
+    const room = getRoom(roomId);
+    if (!room || room.status !== 'lobby') return;
+    if (room.players[0]?.id !== socket.id) return; // host only
+    room.isPublic = !!isPublic;
+    io.to(roomId).emit('room_state_update', room);
+  });
+
+  socket.on('update_room_settings', ({ roomId, roundDuration, roundsPerPlayer, subject, subtopic }) => {
+    if (typeof roomId !== 'string') return;
+    const room = getRoom(roomId);
+    if (!room || room.status !== 'lobby') return;
+    if (room.players[0]?.id !== socket.id) return; // host only
+    
+    if (Number.isInteger(roundDuration) && roundDuration >= 30 && roundDuration <= 300)
+      room.roundDuration = roundDuration;
+    if (Number.isInteger(roundsPerPlayer) && roundsPerPlayer >= 1 && roundsPerPlayer <= 5)
+      room.roundsPerPlayer = roundsPerPlayer;
+    if (typeof subject === 'string') room.subject = subject;
+    if (typeof subtopic === 'string') room.subtopic = subtopic;
+    
+    room.timer = room.roundDuration; // Reset timer for the start of the game
+    io.to(roomId).emit('room_state_update', room);
+  });
+
+  socket.on('end_turn_request', ({ roomId }) => {
     if (typeof roomId !== 'string') return;
     const room = getRoom(roomId);
     if (room && room.status === 'playing') {
       const explainer = room.players[room.currentExplainerIndex % room.players.length];
-      console.log(`[END TURN] Room: ${roomId}, Explainer: ${explainer?.name}, Requester: ${socket.id}`);
       if (explainer && explainer.id === socket.id) {
-        endRound(io, roomId);
+        if (room.endTurnTimeout) return;
+        io.to(roomId).emit('done_countdown_start', { duration: 5 });
+        room.endTurnTimeout = setTimeout(() => {
+          endRound(io, roomId);
+          room.endTurnTimeout = null;
+        }, 5000);
+      }
+    }
+  });
+
+  socket.on('cancel_end_turn', ({ roomId }) => {
+    if (typeof roomId !== 'string') return;
+    const room = getRoom(roomId);
+    if (room && room.status === 'playing' && room.endTurnTimeout) {
+      const explainer = room.players[room.currentExplainerIndex % room.players.length];
+      if (explainer && explainer.id === socket.id) {
+        clearTimeout(room.endTurnTimeout);
+        room.endTurnTimeout = null;
+        io.to(roomId).emit('done_countdown_cancel');
       }
     }
   });
@@ -311,6 +359,12 @@ io.on('connection', (socket) => {
       room.roundScores[socket.id] = validScore;
       io.to(roomId).emit('room_state_update', room);
     }
+  });
+
+  socket.on('chat:message', ({ roomId, playerName, text }) => {
+    if (typeof text !== 'string' || text.trim().length === 0) return;
+    const sanitized = filter.clean(text.trim().slice(0, 200));
+    io.to(roomId).emit('chat:message', { playerName, text: sanitized, ts: Date.now() });
   });
 
   socket.on('disconnect', () => {

@@ -115,13 +115,13 @@ export default function Results() {
                       {player.name} {player.isMe && <span style={{ fontSize: '0.9rem', color: 'var(--text-dim)' }}>(you)</span>}
                     </h3>
                     <div style={{ display: 'flex', gap: '1rem', color: 'var(--text-dim)', fontSize: '1rem', flexWrap: 'wrap' }}>
-                      <span>Score: <b style={{ color: 'var(--text-chalk)' }}>{player.totalPoints.toFixed(1)}</b></span>
+                      <span>Score: <b style={{ color: 'var(--text-chalk)' }}>{(player.totalPoints || 0).toFixed(1)}</b></span>
                       <span>•</span>
-                      <span>Avg: <b style={{ color: 'var(--text-chalk)' }}>{player.avgScore.toFixed(1)}</b></span>
+                      <span>Avg: <b style={{ color: 'var(--text-chalk)' }}>{(player.avgScore || 0).toFixed(1)}</b></span>
                       <span>•</span>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Coins size={14} color="var(--accent-yellow)" />
-                        <b style={{ color: 'var(--accent-yellow)' }}>+{playerCoins}</b>
+                        <b style={{ color: 'var(--accent-yellow)' }}>+{playerCoins || 0}</b>
                       </span>
                     </div>
                   </div>

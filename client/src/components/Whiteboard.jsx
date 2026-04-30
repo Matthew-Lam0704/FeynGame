@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 
-export default function Whiteboard({ isExplainer, color, size, tool, socket, roomId, roomState }) {
+export default function Whiteboard({ isExplainer, color, size, tool, socket, roomId, roomState, onToolChange }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -25,12 +25,8 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
 
   // Sync textboxes with roomState
   useEffect(() => {
-    const remoteBoxes = roomState?.textBoxes || [];
-    // Only update if there's a difference to avoid infinite re-renders or focus issues
-    if (JSON.stringify(remoteBoxes) !== JSON.stringify(textBoxes || [])) {
-      setTextBoxes(remoteBoxes);
-    }
-  }, [roomState?.textBoxes]);
+    setTextBoxes(roomState?.textBoxes || []);
+  }, [roomState?.currentExplainerIndex, roomState?.textBoxes?.length]);
 
   // All players listen for text box events
   useEffect(() => {
@@ -151,6 +147,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       if (socket && roomId) {
         socket.emit('textbox:add', { roomId, id, x, y, text: '' });
       }
+      if (onToolChange) onToolChange('pen');
       return;
     }
 
@@ -218,18 +215,20 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
   };
 
   return (
-    <div
-      ref={containerRef}
-      style={{
-        width: '100%',
-        border: 'var(--border-chalk)',
-        borderRadius: '12px',
-        overflow: 'hidden',
-        boxShadow: 'var(--shadow-lg)',
-        position: 'relative',
-        cursor: isExplainer ? (tool === 'text' ? 'text' : 'crosshair') : 'default',
-      }}
-    >
+    <div className="chalkboard-frame" style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%',
+          flex: 1,
+          border: 'var(--border-chalk)',
+          borderRadius: '4px',
+          overflow: 'hidden',
+          boxShadow: 'inset 0 0 20px rgba(0,0,0,0.4)',
+          position: 'relative',
+          cursor: isExplainer ? (tool === 'text' ? 'text' : 'crosshair') : 'default',
+        }}
+      >
       <canvas
         ref={canvasRef}
         onMouseDown={startDrawing}
@@ -317,6 +316,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
             )}
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Whiteboard from '../components/Whiteboard';
+import ChatBox from '../components/ChatBox';
 import { useSocket } from '../hooks/useSocket';
 import { useAudio } from '../hooks/useAudio';
 import { useSounds } from '../hooks/useSounds';
-import { Pen, Eraser, Trash2, Clock, Mic, MicOff, CheckCircle, Type } from 'lucide-react';
+import { Pen, Eraser, Trash2, Clock, Mic, MicOff, CheckCircle, Type, Users, XCircle } from 'lucide-react';
 
 export default function Game() {
   const { roomId } = useParams();
@@ -23,12 +24,13 @@ export default function Game() {
 
   useAudio(roomId, playerName, isExplainer && !isBetweenRounds, micActive);
 
-  const [timeRemaining, setTimeRemaining] = useState(roomState?.timer || 90);
+  const [timeRemaining, setTimeRemaining] = useState(90); // properly overwritten by useEffect below
   const [transitionTime, setTransitionTime] = useState(5);
   const [color, setColor] = useState('#e8f5e8');
   const [size, setSize] = useState(3);
   const [tool, setTool] = useState('pen');
   const [showWordPopup, setShowWordPopup] = useState(false);
+  const [doneCountdown, setDoneCountdown] = useState(null);
 
   const { play } = useSounds();
 
@@ -39,11 +41,23 @@ export default function Game() {
         if (time <= 10 && time > 0) play('TICK');
       };
       const onTransitionSync = (time) => setTransitionTime(time);
+      
+      const onDoneStart = ({ duration }) => {
+        setDoneCountdown(duration);
+        play('TICK');
+      };
+      const onDoneCancel = () => setDoneCountdown(null);
+
       socket.on('timer_sync', onTimerSync);
       socket.on('transition_timer_sync', onTransitionSync);
+      socket.on('done_countdown_start', onDoneStart);
+      socket.on('done_countdown_cancel', onDoneCancel);
+
       return () => {
         socket.off('timer_sync', onTimerSync);
         socket.off('transition_timer_sync', onTransitionSync);
+        socket.off('done_countdown_start', onDoneStart);
+        socket.off('done_countdown_cancel', onDoneCancel);
       };
     }
   }, [socket, play]);
@@ -128,10 +142,25 @@ export default function Game() {
     }
   };
 
-  const handleEndTurn = () => {
-    if (socket && roomId) {
-      socket.emit('end_turn', { roomId });
+  // Done countdown ticker
+  useEffect(() => {
+    if (doneCountdown === null) return;
+    if (doneCountdown <= 0) {
+      setDoneCountdown(null);
+      return;
     }
+    const t = setInterval(() => {
+      setDoneCountdown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [doneCountdown]);
+
+  const handleEndTurn = () => {
+    if (socket && roomId) socket.emit('end_turn_request', { roomId });
+  };
+
+  const handleCancelEndTurn = () => {
+    if (socket && roomId) socket.emit('cancel_end_turn', { roomId });
   };
 
   const topicWord = roomState?.topic?.term || roomState?.topic?.topic;
@@ -228,20 +257,40 @@ export default function Game() {
         {/* Right: timer + done button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', justifyContent: 'flex-end' }}>
           {isExplainer && (
-            <button
-              onClick={handleEndTurn}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.5rem',
-                padding: '0.5rem 1.2rem', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem',
-                background: 'rgba(36, 200, 100, 0.15)', border: '2px solid rgba(36, 200, 100, 0.6)',
-                color: '#4cdb8a', cursor: 'pointer', transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(36, 200, 100, 0.3)'}
-              onMouseLeave={e => e.currentTarget.style.background = 'rgba(36, 200, 100, 0.15)'}
-            >
-              <CheckCircle size={18} />
-              Done
-            </button>
+            doneCountdown !== null ? (
+              <button
+                onClick={handleCancelEndTurn}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  padding: '0.5rem 1.2rem', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem',
+                  background: 'rgba(224, 85, 85, 0.15)', border: '2px solid var(--accent-red)',
+                  color: 'var(--accent-red)', cursor: 'pointer', animation: 'pulseRed 1s infinite'
+                }}
+              >
+                <XCircle size={18} />
+                Cancel ({doneCountdown}s)
+              </button>
+            ) : (
+              <button
+                onClick={handleEndTurn}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '0.5rem',
+                  padding: '0.5rem 1.2rem', borderRadius: '8px', fontWeight: 'bold', fontSize: '0.95rem',
+                  background: 'rgba(36, 200, 100, 0.15)', border: '2px solid rgba(36, 200, 100, 0.6)',
+                  color: '#4cdb8a', cursor: 'pointer', transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(36, 200, 100, 0.3)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(36, 200, 100, 0.15)'}
+              >
+                <CheckCircle size={18} />
+                Done
+              </button>
+            )
+          )}
+          {!isExplainer && doneCountdown !== null && (
+            <div style={{ color: 'var(--text-dim)', fontSize: '0.9rem', fontStyle: 'italic', marginRight: '0.5rem' }}>
+              Ending turn in {doneCountdown}s...
+            </div>
           )}
           <div style={{
             display: 'flex', alignItems: 'center', gap: '0.5rem',
@@ -260,13 +309,13 @@ export default function Game() {
       </header>
 
       {/* Main Content */}
-      <main style={{ display: 'flex', gap: '1rem', flex: 1, minHeight: 0 }}>
+      <main style={{ display: 'flex', gap: '1rem', flex: 1, minHeight: 0, padding: '1rem', overflow: 'hidden' }}>
 
         {/* Toolbar (Explainer Only) */}
         {isExplainer && (
           <aside className="glass-panel" style={{
             width: '72px', padding: '1.5rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem',
-            borderRight: 'var(--border-chalk)'
+            borderRight: 'var(--border-chalk)', height: '100%', overflowY: 'auto'
           }}>
             <button
               onClick={() => setTool('pen')}
@@ -337,8 +386,8 @@ export default function Game() {
         )}
 
         {/* Board Container */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
-          <div style={{ flex: 1, position: 'relative' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%', minWidth: 0 }}>
+          <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
             <Whiteboard
               isExplainer={isExplainer}
               color={color}
@@ -346,6 +395,8 @@ export default function Game() {
               tool={tool}
               socket={socket}
               roomId={roomId}
+              roomState={roomState}
+              onToolChange={(t) => setTool(t)}
             />
             {isExplainer && (
               <div style={{ position: 'absolute', bottom: '20px', left: '20px', pointerEvents: 'none' }}>
@@ -362,41 +413,41 @@ export default function Game() {
           {/* Bottom Bar: Mic for explainer, Scoring for audience */}
           <div className="glass-panel" style={{
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            padding: '1rem 2rem', borderRadius: '16px'
+            padding: '0.75rem 1.5rem', borderRadius: '16px'
           }}>
             {isExplainer ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
                 <button
                   onClick={() => setMicActive(!micActive)}
                   style={{
-                    width: '56px', height: '56px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '48px', height: '48px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: micActive ? 'rgba(36, 56, 36, 0.8)' : 'rgba(224, 85, 85, 0.4)',
                     border: micActive ? '2px solid var(--text-chalk)' : '2px solid var(--accent-red)',
                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'pointer'
                   }}
                 >
-                  {micActive ? <Mic size={28} color="var(--text-chalk)" /> : <MicOff size={28} color="var(--accent-red)" />}
+                  {micActive ? <Mic size={24} color="var(--text-chalk)" /> : <MicOff size={24} color="var(--accent-red)" />}
                 </button>
                 <div>
-                  <div style={{ color: 'var(--text-chalk)', fontWeight: 'bold' }}>
+                  <div style={{ color: 'var(--text-chalk)', fontWeight: 'bold', fontSize: '0.9rem' }}>
                     {micActive ? 'Microphone Active' : 'Microphone Muted'}
                   </div>
-                  <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                  <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>
                     Everyone can hear you explaining!
                   </div>
                 </div>
               </div>
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '2rem', width: '100%', justifyContent: 'center' }}>
-                <span style={{ color: 'var(--text-chalk)', fontSize: '1.1rem', fontWeight: '500' }}>Rate this explanation:</span>
-                <div style={{ display: 'flex', gap: '0.8rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', width: '100%', justifyContent: 'center' }}>
+                <span style={{ color: 'var(--text-chalk)', fontSize: '1rem', fontWeight: '500' }}>Rate:</span>
+                <div style={{ display: 'flex', gap: '0.6rem' }}>
                   {[1, 2, 3, 4, 5].map(score => (
                     <button
                       key={score}
                       onClick={() => submitScore(score)}
                       className={`score-btn ${roomState.roundScores?.[socket.id] === score ? 'active' : ''}`}
                       style={{
-                        width: '56px', height: '56px', borderRadius: '12px', fontSize: '1.4rem', fontWeight: 'bold',
+                        width: '48px', height: '48px', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold',
                         border: '2px solid rgba(232, 245, 232, 0.2)',
                         background: roomState.roundScores?.[socket.id] === score ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.05)',
                         color: roomState.roundScores?.[socket.id] === score ? 'black' : 'white',
@@ -411,6 +462,31 @@ export default function Game() {
             )}
           </div>
         </div>
+
+        {/* Right Sidebar: Leaderboard + Chat */}
+        <aside style={{ width: '280px', display: 'flex', flexDirection: 'column', gap: '1rem', height: '100%' }}>
+          <div className="glass-panel" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: '200px' }}>
+            <div style={{ padding: '0.8rem 1rem', borderBottom: '1px solid rgba(232, 245, 232, 0.1)', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
+              <Users size={16} color="var(--accent-yellow)" />
+              Leaderboard
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '0.4rem' }}>
+              {[...(roomState.players || [])].sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0)).map((p, idx) => (
+                <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '0.5rem 0.8rem', borderRadius: '8px', background: p.id === explainer?.id ? 'rgba(245, 200, 66, 0.12)' : 'transparent', fontSize: '0.85rem' }}>
+                  <span style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', overflow: 'hidden' }}>
+                    <span style={{ color: 'var(--text-dim)', width: '12px' }}>{idx + 1}</span>
+                    <span style={{ color: p.id === socket?.id ? 'var(--text-chalk)' : 'var(--text-dim)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
+                  </span>
+                  <span style={{ fontWeight: 'bold', color: 'var(--text-chalk)' }}>{(p.totalPoints || 0).toFixed(0)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ flex: 1.5, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: '300px' }}>
+            <ChatBox socket={socket} roomId={roomId} playerName={playerName} />
+          </div>
+        </aside>
       </main>
     </div>
   );

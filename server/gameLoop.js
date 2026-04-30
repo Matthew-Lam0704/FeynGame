@@ -48,6 +48,10 @@ const endRound = (io, roomId) => {
   if (!room || room.status !== 'playing') return;
 
   room.status = 'between_rounds';
+  if (room.endTurnTimeout) {
+    clearTimeout(room.endTurnTimeout);
+    room.endTurnTimeout = null;
+  }
   
   // Calculate final score for the explainer
   const explainerIndex = room.currentExplainerIndex % room.players.length;
