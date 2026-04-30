@@ -54,7 +54,16 @@ export const useUserStore = create((set, get) => ({
   },
 
   initAuth: () => {
+    // Fallback: don't stay in loading state forever
+    const timeout = setTimeout(() => {
+      if (get().isLoading) {
+        console.warn('Auth initialization timed out');
+        set({ isLoading: false });
+      }
+    }, 5000);
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(timeout);
       const user = session?.user ?? null;
       if (user) {
         try { await bootstrapNewUser(user); } catch (_) { /* non-fatal */ }

@@ -12,7 +12,19 @@ function RequireAuth({ children }) {
   const isLoading = useUserStore((state) => state.isLoading)
   const location = useLocation()
 
-  if (isLoading) return null
+  if (isLoading) {
+    return (
+      <div style={{ 
+        minHeight: '100vh', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        background: 'var(--bg-dark)' 
+      }}>
+        <div className="spinner"></div>
+      </div>
+    );
+  }
 
   if (!user) {
     const hasVisited = localStorage.getItem('hasVisited')
