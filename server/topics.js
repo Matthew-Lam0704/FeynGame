@@ -39,19 +39,34 @@ const getRandomWord = (subject, subtopic) => {
   let finalSubject = subject;
   let finalSubtopic = subtopic;
 
+  // Fallback to random subject only if none provided or invalid
   if (!finalSubject || !wordBank[finalSubject]) {
     const subjects = Object.keys(wordBank);
-    finalSubject = subjects[Math.floor(Math.random() * subjects.length)];
+    finalSubject = subjects.includes(subject) ? subject : subjects[Math.floor(Math.random() * subjects.length)];
   }
 
   const subjectData = wordBank[finalSubject];
+  const subtopicKeys = Object.keys(subjectData);
+
+  // Robust subtopic matching
   if (!finalSubtopic || !subjectData[finalSubtopic]) {
-    const subtopics = Object.keys(subjectData);
-    finalSubtopic = subtopics[Math.floor(Math.random() * subtopics.length)];
+    // Try fuzzy match (e.g. "Group 7" matches "Group 7 Halogens")
+    const fuzzyMatch = subtopicKeys.find(key => 
+      finalSubtopic && (key.toLowerCase().includes(finalSubtopic.toLowerCase()) || 
+      finalSubtopic.toLowerCase().includes(key.toLowerCase()))
+    );
+    
+    if (fuzzyMatch) {
+      finalSubtopic = fuzzyMatch;
+    } else {
+      finalSubtopic = subtopicKeys[Math.floor(Math.random() * subtopicKeys.length)];
+    }
   }
 
   const subtopicTerms = subjectData[finalSubtopic];
-  if (!subtopicTerms || subtopicTerms.length === 0) return { subject: finalSubject, subtopic: finalSubtopic, term: 'Unknown' };
+  if (!subtopicTerms || subtopicTerms.length === 0) {
+    return { subject: finalSubject, subtopic: finalSubtopic, term: 'Unknown' };
+  }
 
   const term = subtopicTerms[Math.floor(Math.random() * subtopicTerms.length)];
   return { subject: finalSubject, subtopic: finalSubtopic, term };

@@ -50,6 +50,14 @@ const roomLimiter = rateLimit({
   message: { error: 'Too many rooms created, please try again later.' },
 });
 
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: CLIENT_URL,
+    methods: ['GET', 'POST'],
+  },
+});
+
 app.post('/rooms', roomLimiter, (req, res) => {
   const { roomId, name, isPublic, maxPlayers, roundDuration, roundsPerPlayer, subject, subtopic } = req.body;
   if (typeof roomId !== 'string' || !/^[A-Z0-9]{1,20}$/.test(roomId)) {
@@ -66,8 +74,20 @@ app.post('/rooms', roomLimiter, (req, res) => {
   const safeSubject = typeof subject === 'string' ? subject : null;
   const safeSubtopic = typeof subtopic === 'string' ? subtopic : null;
 
-  if (!getRoom(roomId)) {
+  let room = getRoom(roomId);
+  if (!room) {
     createRoom(roomId, { name: safeName, isPublic: safePublic, maxPlayers: safeMax, roundDuration: safeRoundDuration, roundsPerPlayer: safeRoundsPerPlayer, subject: safeSubject, subtopic: safeSubtopic });
+  } else if (room.status === 'lobby') {
+    // Overwrite defaults if room was auto-created by socket join
+    room.name = safeName;
+    room.isPublic = safePublic;
+    room.maxPlayers = safeMax;
+    room.roundDuration = safeRoundDuration;
+    room.roundsPerPlayer = safeRoundsPerPlayer;
+    room.subject = safeSubject;
+    room.subtopic = safeSubtopic;
+    room.timer = safeRoundDuration;
+    io.to(roomId).emit('room_state_update', room);
   }
   res.json({ roomId });
 });
@@ -156,14 +176,6 @@ app.get('/token', tokenLimiter, async (req, res) => {
   });
   at.addGrant({ roomJoin: true, room: roomId });
   res.json({ token: await at.toJwt() });
-});
-
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: CLIENT_URL,
-    methods: ['GET', 'POST'],
-  },
 });
 
 io.on('connection', (socket) => {

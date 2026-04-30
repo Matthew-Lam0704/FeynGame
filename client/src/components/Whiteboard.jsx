@@ -241,7 +241,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       )}
 
       {/* Text box overlay */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: isExplainer ? 'auto' : 'none' }}>
+      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
         {textBoxes.map(tb => (
           <div
             key={tb.id}
@@ -252,6 +252,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
               transform: 'translate(-2px, -2px)',
               minWidth: '120px',
               maxWidth: '300px',
+              pointerEvents: isExplainer ? 'auto' : 'none'
             }}
           >
             {isExplainer ? (

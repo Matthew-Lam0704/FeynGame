@@ -13,8 +13,8 @@ export default function Game() {
   const [playerName] = useState(localStorage.getItem('playerName') || `Player ${Math.floor(Math.random() * 1000)}`);
   const { socket, roomState, isConnected } = useSocket(roomId, playerName);
 
-  const explainerIndex = roomState
-    ? roomState.currentExplainerIndex % roomState.players.length
+  const explainerIndex = roomState && roomState.players.length > 0
+    ? Math.max(0, roomState.currentExplainerIndex) % roomState.players.length
     : 0;
   const explainer = roomState?.players[explainerIndex];
   const isExplainer = socket?.id === explainer?.id;
@@ -23,7 +23,7 @@ export default function Game() {
 
   useAudio(roomId, playerName, isExplainer && !isBetweenRounds, micActive);
 
-  const [timeRemaining, setTimeRemaining] = useState(90);
+  const [timeRemaining, setTimeRemaining] = useState(roomState?.timer || 90);
   const [transitionTime, setTransitionTime] = useState(5);
   const [color, setColor] = useState('#e8f5e8');
   const [size, setSize] = useState(3);
