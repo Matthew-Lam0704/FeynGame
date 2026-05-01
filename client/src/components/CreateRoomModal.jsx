@@ -35,7 +35,7 @@ export default function CreateRoomModal({ onClose }) {
     const raw = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
     const serverUrl = raw.startsWith('http') ? raw : `https://${raw}`;
     fetch(`${serverUrl}/subjects`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(data => {
         setSubjectStructure(data);
         const firstSubject = Object.keys(data)[0];
@@ -44,7 +44,7 @@ export default function CreateRoomModal({ onClose }) {
           setSubtopic(data[firstSubject][0]);
         }
       })
-      .catch(() => {});
+      .catch(err => console.error('[CreateRoomModal] subjects fetch failed:', err));
   }, []);
 
   const handleCreate = async (e) => {

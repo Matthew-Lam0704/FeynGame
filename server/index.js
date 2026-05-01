@@ -243,7 +243,8 @@ io.on('connection', (socket) => {
     if (typeof roomId !== 'string') return;
     const room = getRoom(roomId);
     if (!room || room.status !== 'lobby') return;
-    if (room.players[0]?.id !== socket.id) return; // host only
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player?.isHost) return;
     room.isPublic = !!isPublic;
     io.to(roomId).emit('room_state_update', room);
   });
@@ -252,7 +253,8 @@ io.on('connection', (socket) => {
     if (typeof roomId !== 'string') return;
     const room = getRoom(roomId);
     if (!room || room.status !== 'lobby') return;
-    if (room.players[0]?.id !== socket.id) return; // host only
+    const player = room.players.find(p => p.id === socket.id);
+    if (!player?.isHost) return;
     
     if (Number.isInteger(roundDuration) && roundDuration >= 30 && roundDuration <= 300)
       room.roundDuration = roundDuration;

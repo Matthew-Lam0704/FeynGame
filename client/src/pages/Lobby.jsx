@@ -16,7 +16,7 @@ export default function Lobby() {
     const raw = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
     const serverUrl = raw.startsWith('http') ? raw : `https://${raw}`;
     fetch(`${serverUrl}/subjects`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(setSubjects)
       .catch(console.error);
   }, []);
@@ -39,7 +39,7 @@ export default function Lobby() {
   }
 
   const players = roomState.players;
-  const me = players.find(p => p.id === socketId) || players[0];
+  const me = players.find(p => p.id === socketId);
   const allReady = players.length >= 2 && players.every(p => p.isReady);
 
   const copyRoomCode = () => {
