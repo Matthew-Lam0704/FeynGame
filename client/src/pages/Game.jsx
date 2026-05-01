@@ -88,6 +88,19 @@ export default function Game() {
     }
   }, [roomState?.status, play, navigate, roomId]);
 
+  // Done countdown ticker — must be before any early returns to keep hook order stable
+  useEffect(() => {
+    if (doneCountdown === null) return;
+    if (doneCountdown <= 0) {
+      setDoneCountdown(null);
+      return;
+    }
+    const t = setInterval(() => {
+      setDoneCountdown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [doneCountdown]);
+
   if (!isConnected || !roomState) {
     return <div className="loading-container" style={{ color: 'var(--text-dim)', padding: '2rem' }}>Reconnecting to game...</div>;
   }
@@ -141,19 +154,6 @@ export default function Game() {
       socket.emit('submit_score', { roomId, score: val });
     }
   };
-
-  // Done countdown ticker
-  useEffect(() => {
-    if (doneCountdown === null) return;
-    if (doneCountdown <= 0) {
-      setDoneCountdown(null);
-      return;
-    }
-    const t = setInterval(() => {
-      setDoneCountdown(prev => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(t);
-  }, [doneCountdown]);
 
   const handleEndTurn = () => {
     if (socket && roomId) socket.emit('end_turn_request', { roomId });
