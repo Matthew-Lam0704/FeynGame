@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Mail, Lock, User } from 'lucide-react';
@@ -18,6 +18,18 @@ export default function Auth() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const loginAsGuest = useUserStore((s) => s.loginAsGuest);
+  const user = useUserStore((s) => s.user);
+  const isLoading = useUserStore((s) => s.isLoading);
+
+  // Redirect once the store confirms the user is authenticated.
+  // This runs after hydrate() completes, avoiding the RequireAuth race condition
+  // where navigate('/') was called before the store had the user set.
+  useEffect(() => {
+    if (user && !isLoading) {
+      const destination = location.state?.from?.pathname || '/';
+      navigate(destination, { replace: true });
+    }
+  }, [user, isLoading, navigate, location.state?.from?.pathname]);
 
   const handleGuestLogin = () => {
     loginAsGuest();
@@ -64,8 +76,7 @@ export default function Auth() {
           console.error('Login error:', authError);
           throw authError;
         }
-        console.log('Login successful, navigating home...');
-        navigate('/');
+        // Navigation is handled by the useEffect above once hydrate() sets the user in the store.
       } else {
         console.log('Calling signUp...');
         const { error: authError } = await supabase.auth.signUp({
