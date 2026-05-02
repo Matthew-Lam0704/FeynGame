@@ -1,18 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import CreateRoomModal from '../components/CreateRoomModal';
 import ProfileHUD from '../components/ProfileHUD';
-import { Play, Users, Hash } from 'lucide-react';
+import OnboardingModal from '../components/OnboardingModal';
+import { Play, Users, Hash, RotateCcw } from 'lucide-react';
 
 const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 const SERVER_URL = rawServerUrl.startsWith('http') ? rawServerUrl : `https://${rawServerUrl}`;
 
 export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(!localStorage.getItem('feyn_onboarded'));
   const [joinCode, setJoinCode] = useState('');
   const [publicRooms, setPublicRooms] = useState([]);
   const [subjectFilter, setSubjectFilter] = useState(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  const error = location.state?.error;
 
   useEffect(() => {
     const fetchRooms = () => {
@@ -36,6 +40,8 @@ export default function Home() {
   return (
     <div className="home-container" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', position: 'relative' }}>
       
+      {showOnboarding && <OnboardingModal onComplete={() => setShowOnboarding(false)} />}
+      
       <ProfileHUD />
 
       <header style={{ textAlign: 'center', marginBottom: '4rem' }} className="animate-fade-in">
@@ -45,43 +51,59 @@ export default function Home() {
         <p style={{ fontSize: '1.25rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>
           explain it simply. win.
         </p>
+        {error && (
+          <div style={{ 
+            marginTop: '2rem', padding: '0.75rem 1.5rem', background: 'rgba(224, 85, 85, 0.1)', 
+            border: '1px solid var(--accent-red)', color: 'var(--accent-red)', borderRadius: '8px',
+            fontSize: '0.9rem', fontWeight: 'bold', animation: 'shake 0.5s ease-in-out'
+          }}>
+            {error}
+          </div>
+        )}
       </header>
 
-      <main style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', justifyContent: 'center', maxWidth: '800px', width: '100%' }}>
+      <main style={{ width: '100%', maxWidth: '900px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '2rem' }}>
         
         {/* Create Room Card */}
-        <div className="glass-panel" style={{ padding: '2rem', flex: '1', minWidth: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Play size={48} color="var(--accent-yellow)" style={{ marginBottom: '1rem' }} />
-          <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Host a Game</h2>
-          <p style={{ textAlign: 'center', color: 'var(--text-dim)', marginBottom: '2rem' }}>
-            Create a room, choose subjects, and invite friends.
+        <div className="glass-panel" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', transition: 'transform 0.3s ease' }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: 'rgba(245, 200, 66, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
+            <Play size={40} color="var(--accent-yellow)" />
+          </div>
+          <h2 style={{ marginBottom: '1rem', fontSize: '1.8rem', fontFamily: 'var(--font-serif)' }}>Host a Game</h2>
+          <p style={{ color: 'var(--text-dim)', marginBottom: '2.5rem', lineHeight: '1.6' }}>
+            Create a custom room, choose subjects, and challenge your friends.
           </p>
-          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ width: '100%', fontSize: '1.2rem', padding: '1rem' }}>
-            Create Room
+          <button className="btn btn-primary" onClick={() => setIsModalOpen(true)} style={{ width: '100%', fontSize: '1.1rem', fontWeight: 'bold', letterSpacing: '0.02em' }}>
+            Create New Room
           </button>
         </div>
 
         {/* Join Room Card */}
-        <div className="glass-panel" style={{ padding: '2rem', flex: '1', minWidth: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <Hash size={48} color="var(--accent-blue)" style={{ marginBottom: '1rem' }} />
-          <h2 style={{ marginBottom: '1.5rem', fontSize: '1.5rem' }}>Join by Code</h2>
-          <form onSubmit={handleJoinCode} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <div className="glass-panel" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+          <div style={{ width: '80px', height: '80px', borderRadius: '24px', background: 'rgba(85, 153, 224, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '1.5rem' }}>
+            <Hash size={40} color="var(--accent-blue)" />
+          </div>
+          <h2 style={{ marginBottom: '1rem', fontSize: '1.8rem', fontFamily: 'var(--font-serif)' }}>Join by Code</h2>
+          <form onSubmit={handleJoinCode} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
             <input 
               type="text" 
-              placeholder="Enter Room Code" 
+              placeholder="ROOM CODE" 
               value={joinCode}
+              maxLength={6}
               onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
               style={{
-                width: '100%', padding: '1rem', borderRadius: '8px', border: 'var(--border-chalk)', 
-                background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-chalk)', fontSize: '1.2rem',
-                textAlign: 'center', textTransform: 'uppercase'
+                width: '100%', padding: '1.2rem', borderRadius: '16px', border: '2px solid rgba(255,255,255,0.1)', 
+                background: 'rgba(0, 0, 0, 0.2)', color: 'var(--text-chalk)', fontSize: '1.6rem',
+                textAlign: 'center', textTransform: 'uppercase', fontFamily: 'var(--font-mono)', fontWeight: 'bold',
+                letterSpacing: '0.2em'
               }}
             />
-            <button type="submit" className="btn" style={{ width: '100%', fontSize: '1.2rem', padding: '1rem', border: '2px solid var(--accent-blue)', color: 'var(--text-chalk)' }}>
-              Join Game
+            <button type="submit" className="btn" style={{ width: '100%', fontSize: '1.1rem', fontWeight: 'bold', border: '2px solid var(--accent-blue)', color: 'var(--text-chalk)' }}>
+              Enter Room
             </button>
           </form>
         </div>
+      </main>
       </main>
 
       {/* Public Rooms Section */}
@@ -90,6 +112,27 @@ export default function Home() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1 }}>
             <Users size={24} color="var(--text-chalk)" />
             <h2 style={{ fontSize: '1.5rem' }}>Live Public Rooms</h2>
+            <button 
+              onClick={() => {
+                const fetchRooms = () => {
+                  fetch(`${SERVER_URL}/rooms`)
+                    .then(r => r.json())
+                    .then(setPublicRooms)
+                    .catch(() => {});
+                };
+                fetchRooms();
+              }}
+              style={{
+                background: 'transparent', border: 'none', color: 'var(--text-dim)', 
+                cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
+                fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-chalk)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-dim)'}
+            >
+              <RotateCcw size={14} /> Refresh
+            </button>
           </div>
           
           {/* Subject Filter Chips */}
@@ -141,6 +184,15 @@ export default function Home() {
                         border: '1px solid rgba(245, 200, 66, 0.2)', textTransform: 'uppercase'
                       }}>
                         {room.subject} {room.subtopic ? `· ${room.subtopic}` : ''}
+                      </span>
+                    )}
+                    {(room.status === 'playing' || room.status === 'between_rounds') && (
+                      <span style={{ 
+                        fontSize: '0.7rem', padding: '2px 8px', borderRadius: '4px', 
+                        background: 'rgba(85, 153, 224, 0.1)', color: 'var(--accent-blue)',
+                        border: '1px solid rgba(85, 153, 224, 0.2)', textTransform: 'uppercase'
+                      }}>
+                        In Progress
                       </span>
                     )}
                   </div>

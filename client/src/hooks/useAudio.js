@@ -10,6 +10,7 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
   const [participants, setParticipants] = useState([]);
   const [error, setError] = useState(null);
   const localTrackRef = useRef(null);
+  const initialStreamRef = useRef(null);
 
   useEffect(() => {
     if (!roomId || !playerName) return;
@@ -51,7 +52,10 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
 
         // Prompt the browser mic dialog at game load so it doesn't interrupt gameplay
         navigator.mediaDevices.getUserMedia({ audio: true })
-          .then(stream => stream.getTracks().forEach(t => t.stop()))
+          .then(stream => {
+            initialStreamRef.current = stream;
+            stream.getTracks().forEach(t => t.stop());
+          })
           .catch(() => {});
 
         updateParticipants();
@@ -66,10 +70,25 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
     return () => {
       roomPromise.then(r => {
         if (!r) return;
+        
+        // Stop initial permission stream if still active
+        if (initialStreamRef.current) {
+          initialStreamRef.current.getTracks().forEach(t => t.stop());
+          initialStreamRef.current = null;
+        }
+
         if (localTrackRef.current) {
+          r.localParticipant.unpublishTrack(localTrackRef.current);
           localTrackRef.current.stop();
           localTrackRef.current = null;
         }
+
+        // Force stop all local tracks
+        r.localParticipant.trackPublications.forEach(pub => {
+          if (pub.track) pub.track.stop();
+        });
+        r.localParticipant.unpublishAllTracks();
+
         document.querySelectorAll('audio[data-livekit]').forEach(el => el.remove());
         r.disconnect();
       });
@@ -90,7 +109,10 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
         }
       } else {
         if (localTrackRef.current) {
-          await localTrackRef.current.mute();
+          const track = localTrackRef.current;
+          await room.localParticipant.unpublishTrack(track);
+          track.stop();
+          localTrackRef.current = null;
         }
       }
     };

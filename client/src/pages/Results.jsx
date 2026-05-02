@@ -5,13 +5,15 @@ import { Trophy, Home, RefreshCw, Coins } from 'lucide-react';
 import { useSocket } from '../hooks/useSocket';
 import { useUserStore } from '../store/useUserStore';
 
+import confetti from 'canvas-confetti';
+
 const COINS_PER_POINT = 5;
 
 export default function Results() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const [playerName] = useState(localStorage.getItem('playerName') || `Player ${Math.floor(Math.random() * 1000)}`);
-  const { socket, roomState, isConnected } = useSocket(roomId, playerName);
+  const { socket, roomState, isConnected } = useSocket(roomId, playerName, navigate);
   const { refreshProfile, isGuest } = useUserStore();
   const refreshedRef = useRef(false);
   const [coinsEarned, setCoinsEarned] = useState(0);
@@ -26,10 +28,65 @@ export default function Results() {
     const earned = Math.round((me.totalPoints || 0) * COINS_PER_POINT);
     setCoinsEarned(earned);
 
+    // Fire confetti!
+    const sorted = [...roomState.players].sort((a, b) => b.totalPoints - a.totalPoints);
+    const isWinner = sorted[0]?.id === socket.id;
+
+    if (isWinner) {
+      // Big celebration for the winner
+      const duration = 3 * 1000;
+      const end = Date.now() + duration;
+
+      const frame = () => {
+        confetti({
+          particleCount: 3,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 },
+          colors: ['#f5c842', '#e8f5e8', '#5599e0']
+        });
+        confetti({
+          particleCount: 3,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 },
+          colors: ['#f5c842', '#e8f5e8', '#e05555']
+        });
+
+        if (Date.now() < end) {
+          requestAnimationFrame(frame);
+        }
+      };
+      frame();
+    } else {
+      // Small burst for everyone else
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#f5c842', '#e8f5e8']
+      });
+    }
+
     // The server has already awarded these coins to authenticated players via
     // the award_coins RPC at game end — we just refetch to update the HUD.
     if (!isGuest && earned > 0) {
       refreshProfile().catch(err => console.error('Failed to refresh profile after game:', err));
+    }
+
+    // Local Lifetime Stat Tracking
+    const userId = useUserStore.getState().user?.id;
+    if (userId) {
+      const statsKey = `feyn_stats_${userId}`;
+      const games = parseInt(localStorage.getItem(`${statsKey}_games`) || '0') + 1;
+      const total = parseFloat(localStorage.getItem(`${statsKey}_total`) || '0') + (me.totalPoints || 0);
+      const avg = total / games;
+      const wins = parseInt(localStorage.getItem(`${statsKey}_wins`) || '0') + (isWinner ? 1 : 0);
+
+      localStorage.setItem(`${statsKey}_games`, games.toString());
+      localStorage.setItem(`${statsKey}_total`, total.toString());
+      localStorage.setItem(`${statsKey}_avg`, avg.toString());
+      localStorage.setItem(`${statsKey}_wins`, wins.toString());
     }
   }, [roomState, socket, refreshProfile, isGuest]);
 
@@ -139,7 +196,7 @@ export default function Results() {
       </main>
 
       <footer style={{ display: 'flex', gap: '2rem', position: 'relative', zIndex: 1 }}>
-        <button className="btn btn-secondary" onClick={() => navigate('/')} style={{
+        <button className="btn btn-secondary" onClick={() => { socket?.emit('leave_room', { roomId }); navigate('/'); }} style={{
           display: 'flex', alignItems: 'center', gap: '0.8rem', padding: '1rem 2rem', fontSize: '1.1rem',
           background: 'transparent', border: '2px solid var(--text-chalk)', color: 'var(--text-chalk)', borderRadius: '12px'
         }}>

@@ -26,9 +26,12 @@ const awardCoinsForRoom = async (room) => {
   const admin = getAdmin();
   if (!admin) return;
 
+  const multiplier = room.difficulty === 'hard' ? 2 : (room.difficulty === 'easy' ? 1 : 1.5);
+
   await Promise.all(room.players.map(async (player) => {
     if (!player.userId) return;
-    const amount = Math.round((player.totalPoints || 0) * COINS_PER_POINT);
+    const baseAmount = Math.round((player.totalPoints || 0) * COINS_PER_POINT);
+    const amount = Math.round(baseAmount * multiplier);
     if (amount <= 0) return;
     const { error } = await admin.rpc('award_coins', {
       p_user: player.userId,
@@ -37,7 +40,7 @@ const awardCoinsForRoom = async (room) => {
     if (error) {
       console.error(`[AWARD] Failed for user ${player.userId}:`, error.message);
     } else {
-      console.log(`[AWARD] +${amount} coins to user ${player.userId} in room ${room.id}`);
+      console.log(`[AWARD] +${amount} coins (${multiplier}x) to user ${player.userId} in room ${room.id}`);
     }
   }));
 };
@@ -54,19 +57,58 @@ const startNextRound = (io, roomId) => {
 
   if (room.currentExplainerIndex >= (room.totalRounds || room.players.length)) {
     room.status = 'results';
+    room.players.forEach(p => { p.isReady = false; });
     awardCoinsForRoom(room).catch(err => console.error('[AWARD] unexpected error:', err));
     io.to(roomId).emit('room_state_update', room);
     return;
   }
 
-  room.status = 'playing';
-  room.timer = room.roundDuration || 90;
-  room.topic = getRandomWord(room.subject, room.subtopic);
+  room.status = 'selecting_topic';
+  
+  if (room.customWords && room.customWords.length > 0) {
+    const shuffled = [...room.customWords].sort(() => Math.random() - 0.5);
+    room.topicChoices = shuffled.slice(0, 3).map(term => ({ subject: 'Custom', subtopic: 'Room', term }));
+  } else {
+    room.topicChoices = [
+      getRandomWord(room.subject, room.subtopic),
+      getRandomWord(room.subject, room.subtopic),
+      getRandomWord(room.subject, room.subtopic)
+    ];
+  }
+  
+  room.timer = 10;
   room.roundScores = {}; // Reset scores for new round
   room.textBoxes = []; // Clear textboxes for new round
   
   io.to(roomId).emit('room_state_update', room);
   io.to(roomId).emit('canvas_clear');
+
+  const selectionInterval = setInterval(() => {
+    const currentRoom = getRoom(roomId);
+    if (!currentRoom || currentRoom.status !== 'selecting_topic') {
+      clearInterval(selectionInterval);
+      return;
+    }
+
+    if (currentRoom.timer > 0) {
+      currentRoom.timer -= 1;
+      io.to(roomId).emit('timer_sync', currentRoom.timer);
+    } else {
+      clearInterval(selectionInterval);
+      // Auto-pick first topic
+      currentRoom.topic = currentRoom.topicChoices[0];
+      startExplaining(io, roomId);
+    }
+  }, 1000);
+};
+
+const startExplaining = (io, roomId) => {
+  const room = getRoom(roomId);
+  if (!room) return;
+
+  room.status = 'playing';
+  room.timer = room.roundDuration || 90;
+  io.to(roomId).emit('room_state_update', room);
 
   const timerInterval = setInterval(() => {
     const currentRoom = getRoom(roomId);
@@ -127,5 +169,6 @@ const endRound = (io, roomId) => {
 
 module.exports = {
   startNextRound,
-  endRound
+  endRound,
+  startExplaining
 };

@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Copy, CheckCircle, Circle, Play, User, Clock, RotateCcw, BookOpen, Globe, Lock, Settings } from 'lucide-react';
+import { Copy, CheckCircle, Circle, Play, User, Clock, RotateCcw, BookOpen, Globe, Lock, Settings, Share2 } from 'lucide-react';
 import { useSocket } from '../hooks/useSocket';
+import AvatarFrame from '../components/AvatarFrame';
 
 export default function Lobby() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const [playerName] = useState(localStorage.getItem('playerName') || `Player ${Math.floor(Math.random() * 1000)}`);
   
-  const { roomState, isConnected, socketId, toggleReady, startGame, socket } = useSocket(roomId, playerName);
+  const { roomState, isConnected, socketId, toggleReady, startGame, socket } = useSocket(roomId, playerName, navigate);
   const [isCopied, setIsCopied] = useState(false);
   const [subjects, setSubjects] = useState({});
 
@@ -19,7 +20,28 @@ export default function Lobby() {
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
       .then(setSubjects)
       .catch(console.error);
-  }, []);
+
+    // Check if room exists
+    fetch(`${serverUrl}/rooms/${roomId}`)
+      .then(r => {
+        if (r.status === 404) {
+          navigate('/', { state: { error: 'Room not found' } });
+        }
+      })
+      .catch(() => {});
+  }, [roomId, navigate]);
+
+  useEffect(() => {
+    const onJoinError = (err) => {
+      if (err.code === 'ROOM_NOT_FOUND') {
+        navigate('/', { state: { error: 'Room not found or session ended.' } });
+      }
+    };
+    socket.on('join_error', onJoinError);
+    return () => {
+      socket.off('join_error', onJoinError);
+    };
+  }, [socket, navigate]);
 
   useEffect(() => {
     if (roomState?.status === 'playing') {
@@ -46,6 +68,12 @@ export default function Lobby() {
     navigator.clipboard.writeText(roomId);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const copyRoomUrl = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setIsCopiedUrl(true);
+    setTimeout(() => setIsCopiedUrl(false), 2000);
   };
 
   return (
@@ -76,11 +104,27 @@ export default function Lobby() {
             <div style={{ 
               position: 'absolute', top: '-40px', left: '50%', transform: 'translateX(-50%)',
               background: '#f5c842', color: '#1e2e1e', padding: '4px 12px', borderRadius: '4px',
-              fontSize: '0.8rem', fontWeight: 'bold', animation: 'fadeInOut 2s forwards'
+              fontSize: '0.8rem', fontWeight: 'bold', whiteSpace: 'nowrap'
             }}>
-              COPIED!
+              Code Copied!
             </div>
           )}
+        </div>
+
+        <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'center' }}>
+          <button 
+            onClick={copyRoomUrl}
+            className="btn"
+            style={{ 
+              display: 'flex', alignItems: 'center', gap: '8px', 
+              padding: '0.6rem 1.2rem', fontSize: '0.9rem',
+              background: 'rgba(85, 153, 224, 0.1)', border: '1px solid rgba(85, 153, 224, 0.3)',
+              color: 'var(--accent-blue)', borderRadius: '8px', cursor: 'pointer'
+            }}
+          >
+            <Share2 size={16} />
+            {isCopiedUrl ? 'Link Copied!' : 'Copy Invite Link'}
+          </button>
         </div>
       </header>
 
@@ -105,14 +149,20 @@ export default function Lobby() {
                   YOU
                 </div>
               )}
-              <div style={{ 
-                width: '72px', height: '72px', borderRadius: '50%', 
-                background: player.isReady ? '#f5c842' : 'rgba(255,255,255,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.8rem', fontWeight: 'bold',
-                marginBottom: '1rem', color: player.isReady ? '#1e2e1e' : 'var(--text-chalk)',
-                transition: 'all 0.3s ease'
-              }}>
-                {player.name?.charAt(0).toUpperCase() || '?'}
+              <div style={{ position: 'relative', marginBottom: '1.5rem' }}>
+                <AvatarFrame 
+                  src={`https://api.dicebear.com/7.x/thumbs/svg?seed=${player.name}`} 
+                  size={100}
+                  frameId={player.selectedFrameId}
+                />
+                {player.isReady && (
+                  <div style={{ 
+                    position: 'absolute', inset: '-10px', borderRadius: '50%', 
+                    border: '3px solid var(--accent-yellow)',
+                    boxShadow: '0 0 20px var(--accent-yellow), inset 0 0 10px var(--accent-yellow)',
+                    animation: 'pulseRed 2s infinite'
+                  }} />
+                )}
               </div>
               <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem', color: 'var(--text-chalk)' }}>{player.name}</h3>
               

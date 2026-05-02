@@ -6,6 +6,7 @@ import { useUserStore } from '../store/useUserStore';
 import { supabase } from '../lib/supabase';
 import { FRAMES } from '../lib/frames';
 import AvatarFrame from './AvatarFrame';
+import VolumeSlider from './VolumeSlider';
 
 const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 // Guard against missing protocol (e.g. Vercel dashboard env var without https://)
@@ -317,19 +318,7 @@ function AudioSection({ inputDevices, outputDevices, selectedInput, selectedOutp
               <span style={{ color: 'var(--accent-yellow)', fontFamily: 'var(--font-mono)', fontSize: '0.9rem' }}>{volume}%</span>
             </label>
             <div style={{ position: 'relative' }}>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={volume}
-                onChange={e => onVolumeChange(Number(e.target.value))}
-                style={rangeStyle}
-              />
-              <div style={{
-                position: 'absolute', top: '50%', left: 0, transform: 'translateY(-50%)',
-                height: '4px', width: `${volume}%`, background: 'var(--accent-yellow)',
-                borderRadius: '2px', pointerEvents: 'none', transition: 'width 0.05s',
-              }} />
+              <VolumeSlider value={volume} onChange={onVolumeChange} />
             </div>
           </div>
         </>
@@ -584,8 +573,5 @@ const selectStyle = {
 };
 
 const rangeStyle = {
-  width: '100%', appearance: 'none',
-  height: '4px', borderRadius: '2px',
-  background: 'rgba(255,255,255,0.1)',
-  outline: 'none', cursor: 'pointer',
+  display: 'none',
 };

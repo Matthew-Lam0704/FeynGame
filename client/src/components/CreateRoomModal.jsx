@@ -20,15 +20,23 @@ const chipBase = {
   fontWeight: 'bold', cursor: 'pointer', transition: 'all 0.15s ease', border: '2px solid transparent'
 };
 
+const DIFFICULTY_OPTIONS = [
+  { label: 'Easy', value: 'easy', multiplier: 1, color: '#5599e0' },
+  { label: 'Normal', value: 'normal', multiplier: 1.5, color: '#f5c842' },
+  { label: 'Hard', value: 'hard', multiplier: 2, color: '#e05555' },
+];
+
 export default function CreateRoomModal({ onClose }) {
   const [subjectStructure, setSubjectStructure] = useState({});
   const [roomName, setRoomName] = useState('');
   const [subject, setSubject] = useState('');
   const [subtopic, setSubtopic] = useState('');
+  const [difficulty, setDifficulty] = useState('normal');
   const [isPublic, setIsPublic] = useState(false);
   const [maxPlayers, setMaxPlayers] = useState(4);
   const [roundDuration, setRoundDuration] = useState(90);
   const [roundsPerPlayer, setRoundsPerPlayer] = useState(1);
+  const [customWords, setCustomWords] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,9 +57,14 @@ export default function CreateRoomModal({ onClose }) {
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no O, 0, I, 1
+    const genCode = () => Array.from({ length: 6 }, () => CHARSET[Math.floor(Math.random() * CHARSET.length)]).join('');
+    const roomCode = genCode();
     const raw = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
     const serverUrl = raw.startsWith('http') ? raw : `https://${raw}`;
+    
+    const parsedCustom = customWords.split(',').map(w => w.trim()).filter(Boolean);
+
     const resp = await fetch(`${serverUrl}/rooms`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -63,7 +76,9 @@ export default function CreateRoomModal({ onClose }) {
         roundDuration, 
         roundsPerPlayer, 
         subject, 
-        subtopic 
+        subtopic,
+        customWords: parsedCustom,
+        difficulty
       }),
     });
 
@@ -130,6 +145,50 @@ export default function CreateRoomModal({ onClose }) {
                 <option key={st} value={st}>{st}</option>
               ))}
             </select>
+          </div>
+
+          {/* Custom Topics */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-dim)' }}>Custom Topics (Optional)</label>
+            <textarea
+              value={customWords}
+              onChange={(e) => setCustomWords(e.target.value)}
+              placeholder="e.g. Gravity, Black Holes, Time Dilation..."
+              style={{
+                width: '100%', padding: '0.8rem', borderRadius: '6px', border: 'var(--border-chalk)',
+                background: 'rgba(255, 255, 255, 0.05)', color: 'var(--text-chalk)', fontSize: '1rem',
+                minHeight: '80px', resize: 'vertical', fontFamily: 'inherit'
+              }}
+            />
+            <p style={{ marginTop: '0.4rem', fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+              Separate topics with commas. If provided, we'll use these instead of the subject bank.
+            </p>
+          </div>
+
+          {/* Difficulty */}
+          <div>
+            <label style={{ display: 'block', marginBottom: '0.75rem', color: 'var(--text-dim)' }}>
+              Difficulty & Reward Multiplier
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              {DIFFICULTY_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setDifficulty(opt.value)}
+                  style={{
+                    ...chipBase,
+                    background: difficulty === opt.value ? opt.color : 'rgba(255,255,255,0.05)',
+                    color: difficulty === opt.value ? '#1e2e1e' : 'var(--text-dim)',
+                    borderColor: difficulty === opt.value ? 'white' : 'rgba(232,245,232,0.1)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: '100px', gap: '2px'
+                  }}
+                >
+                  <span style={{ fontSize: '0.9rem' }}>{opt.label}</span>
+                  <span style={{ fontSize: '0.7rem', opacity: 0.8 }}>{opt.multiplier}x Coins</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Round Duration */}

@@ -1,10 +1,44 @@
 import React, { useRef, useState, useEffect } from 'react';
+import { Move } from 'lucide-react';
 
-export default function Whiteboard({ isExplainer, color, size, tool, socket, roomId, roomState, onToolChange }) {
+export default function Whiteboard({ isExplainer, color, size, tool, socket, roomId, roomState, onToolChange, elasticity = 0.3 }) {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const prevPointRef = useRef(null);
+  const remotePrevPointRef = useRef(null);
+  const shapeStartRef = useRef(null);
+  const snapshotRef = useRef(null);
+  const lastEmitRef = useRef(0);
   const [isDrawing, setIsDrawing] = useState(false);
   const [textBoxes, setTextBoxes] = useState([]);
+
+  const SHAPES = ['line', 'rect', 'circle', 'arrow'];
+
+  const drawShape = (ctx, type, x1, y1, x2, y2, color, size) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = size;
+    ctx.beginPath();
+    if (type === 'line') {
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+    } else if (type === 'rect') {
+      ctx.strokeRect(x1, y1, x2 - x1, y2 - y1);
+    } else if (type === 'circle') {
+      const radius = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+      ctx.arc(x1, y1, radius, 0, 2 * Math.PI);
+    } else if (type === 'arrow') {
+      const headlen = size * 3;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const angle = Math.atan2(dy, dx);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+    }
+    ctx.stroke();
+  };
 
   // All players listen for canvas_clear (also clears text boxes)
   useEffect(() => {
@@ -39,22 +73,31 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       });
     };
 
-    const onTextboxUpdate = ({ id, text }) => {
-      setTextBoxes(prev => prev.map(tb => tb.id === id ? { ...tb, text } : tb));
+    const onTextboxUpdate = ({ id, ...updates }) => {
+      setTextBoxes(prev => prev.map(tb => tb.id === id ? { ...tb, ...updates } : tb));
     };
 
     const onTextboxDelete = ({ id }) => {
       setTextBoxes(prev => prev.filter(tb => tb.id !== id));
     };
 
+    const onShapeReplay = ({ type, x1, y1, x2, y2, color, size }) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      drawShape(ctx, type, x1 * canvas.width, y1 * canvas.height, x2 * canvas.width, y2 * canvas.height, color, size);
+    };
+
     socket.on('textbox:add', onTextboxAdd);
     socket.on('textbox:update', onTextboxUpdate);
     socket.on('textbox:delete', onTextboxDelete);
+    socket.on('shape:replay', onShapeReplay);
 
     return () => {
       socket.off('textbox:add', onTextboxAdd);
       socket.off('textbox:update', onTextboxUpdate);
       socket.off('textbox:delete', onTextboxDelete);
+      socket.off('shape:replay', onShapeReplay);
     };
   }, [socket]);
 
@@ -71,15 +114,23 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       const y = stroke.y * canvas.height;
 
       if (stroke.type === 'start') {
+        remotePrevPointRef.current = { x, y };
         ctx.beginPath();
         ctx.moveTo(x, y);
       } else if (stroke.type === 'draw') {
+        if (!remotePrevPointRef.current) remotePrevPointRef.current = { x, y };
+        const midX = remotePrevPointRef.current.x + (x - remotePrevPointRef.current.x) / 2;
+        const midY = remotePrevPointRef.current.y + (y - remotePrevPointRef.current.y) / 2;
+        
         ctx.strokeStyle = stroke.tool === 'eraser' ? '#1e2e1e' : stroke.color;
         ctx.lineWidth = stroke.tool === 'eraser' ? stroke.size * 3 : stroke.size;
-        ctx.lineTo(x, y);
+        
+        ctx.quadraticCurveTo(remotePrevPointRef.current.x, remotePrevPointRef.current.y, midX, midY);
         ctx.stroke();
+        remotePrevPointRef.current = { x, y };
       } else if (stroke.type === 'stop') {
         ctx.closePath();
+        remotePrevPointRef.current = null;
       }
     };
 
@@ -87,7 +138,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     return () => socket.off('stroke:replay', onStrokeReplay);
   }, [socket, isExplainer]);
 
-  // Set up canvas context and scaling
+  // Set up canvas context and scaling with ResizeObserver
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -95,19 +146,41 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
 
     const updateSize = () => {
       const rect = container.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.width * (9 / 16);
+      const newW = rect.width;
+      const newH = rect.width * (9 / 16);
+      
+      if (newW === 0 || (newW === canvas.width && newH === canvas.height)) return;
+
+      // Snapshot existing content
+      const snapshot = canvas.toDataURL();
+      
+      canvas.width = newW;
+      canvas.height = newH;
 
       const ctx = canvas.getContext('2d');
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.fillStyle = '#1e2e1e';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, newW, newH);
+
+      // Restore snapshot
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, newW, newH);
+      };
+      img.src = snapshot;
     };
 
+    const resizeObserver = new ResizeObserver(() => {
+      updateSize();
+    });
+
+    resizeObserver.observe(container);
     updateSize();
-    window.addEventListener('resize', updateSize);
-    return () => window.removeEventListener('resize', updateSize);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, []);
 
   const emitStroke = (type, x, y) => {
@@ -119,10 +192,10 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     });
   };
 
-  const handleTextChange = (id, newText) => {
-    setTextBoxes(prev => prev.map(tb => tb.id === id ? { ...tb, text: newText } : tb));
+  const handleTextUpdate = (id, updates) => {
+    setTextBoxes(prev => prev.map(tb => tb.id === id ? { ...tb, ...updates } : tb));
     if (socket && roomId) {
-      socket.emit('textbox:update', { roomId, id, text: newText });
+      socket.emit('textbox:update', { roomId, id, ...updates });
     }
   };
 
@@ -131,6 +204,36 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     if (socket && roomId) {
       socket.emit('textbox:delete', { roomId, id });
     }
+  };
+
+  const handleTextDrag = (e, id) => {
+    e.stopPropagation();
+    const target = e.currentTarget;
+    target.setPointerCapture(e.pointerId);
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const tb = textBoxes.find(t => t.id === id);
+    if (!tb) return;
+    
+    const initialX = tb.x;
+    const initialY = tb.y;
+    const canvas = canvasRef.current;
+
+    const onMove = (moveEvent) => {
+      const dx = (moveEvent.clientX - startX) / canvas.width;
+      const dy = (moveEvent.clientY - startY) / canvas.height;
+      handleTextUpdate(id, { x: initialX + dx, y: initialY + dy });
+    };
+
+    const onUp = () => {
+      target.releasePointerCapture(e.pointerId);
+      target.removeEventListener('pointermove', onMove);
+      target.removeEventListener('pointerup', onUp);
+    };
+
+    target.addEventListener('pointermove', onMove);
+    target.addEventListener('pointerup', onUp);
   };
 
   const startDrawing = (e) => {
@@ -157,10 +260,17 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    ctx.beginPath();
-    ctx.moveTo(x, y);
+    if (SHAPES.includes(tool)) {
+      shapeStartRef.current = { x, y };
+      snapshotRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    } else {
+      prevPointRef.current = { x, y };
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      emitStroke('start', x, y);
+    }
+    
     setIsDrawing(true);
-    emitStroke('start', x, y);
   };
 
   const draw = (e) => {
@@ -169,8 +279,23 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const rawX = e.clientX - rect.left;
+    const rawY = e.clientY - rect.top;
+
+    if (SHAPES.includes(tool)) {
+      if (!snapshotRef.current) return;
+      ctx.putImageData(snapshotRef.current, 0, 0);
+      drawShape(ctx, tool, shapeStartRef.current.x, shapeStartRef.current.y, rawX, rawY, color, size);
+      return;
+    }
+
+    if (!prevPointRef.current) prevPointRef.current = { x: rawX, y: rawY };
+    
+    // EMA Smoothing
+    const x = prevPointRef.current.x + (rawX - prevPointRef.current.x) * (1 - elasticity);
+    const y = prevPointRef.current.y + (rawY - prevPointRef.current.y) * (1 - elasticity);
+    const midX = prevPointRef.current.x + (x - prevPointRef.current.x) / 2;
+    const midY = prevPointRef.current.y + (y - prevPointRef.current.y) / 2;
 
     if (tool === 'eraser') {
       ctx.strokeStyle = '#1e2e1e';
@@ -180,18 +305,54 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
       ctx.lineWidth = size;
     }
 
-    ctx.lineTo(x, y);
+    ctx.quadraticCurveTo(prevPointRef.current.x, prevPointRef.current.y, midX, midY);
     ctx.stroke();
-    emitStroke('draw', x, y);
+    prevPointRef.current = { x, y };
+
+    // 10ms throttle for emission
+    const now = Date.now();
+    if (now - lastEmitRef.current > 10) {
+      emitStroke('draw', x, y);
+      lastEmitRef.current = now;
+    }
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = (e) => {
     if (tool === 'text') return;
     if (!isDrawing || !isExplainer) return;
-    const ctx = canvasRef.current.getContext('2d');
-    ctx.closePath();
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    if (SHAPES.includes(tool) && shapeStartRef.current) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX || e.changedTouches?.[0]?.clientX) - rect.left;
+      const y = (e.clientY || e.changedTouches?.[0]?.clientY) - rect.top;
+      
+      // Final draw
+      if (snapshotRef.current) ctx.putImageData(snapshotRef.current, 0, 0);
+      drawShape(ctx, tool, shapeStartRef.current.x, shapeStartRef.current.y, x, y, color, size);
+
+      if (socket && roomId) {
+        socket.emit('shape:draw', {
+          roomId,
+          type: tool,
+          x1: shapeStartRef.current.x / canvas.width,
+          y1: shapeStartRef.current.y / canvas.height,
+          x2: x / canvas.width,
+          y2: y / canvas.height,
+          color,
+          size
+        });
+      }
+      shapeStartRef.current = null;
+      snapshotRef.current = null;
+    } else {
+      ctx.closePath();
+      emitStroke('stop');
+    }
+
     setIsDrawing(false);
-    emitStroke('stop');
+    prevPointRef.current = null;
   };
 
   const handleTouchStart = (e) => {
@@ -220,7 +381,7 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
         ref={containerRef}
         style={{
           width: '100%',
-          flex: 1,
+          aspectRatio: '16/9',
           border: 'var(--border-chalk)',
           borderRadius: '4px',
           overflow: 'hidden',
@@ -278,10 +439,29 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
                 >
                   ×
                 </button>
+                <div 
+                  onPointerDown={(e) => handleTextDrag(e, tb.id)}
+                  style={{
+                    position: 'absolute', top: '-10px', left: '-10px',
+                    width: '24px', height: '24px', borderRadius: '50%',
+                    background: 'var(--accent-blue)', color: 'white',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    cursor: 'grab', zIndex: 10, border: '2px solid white',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  <Move size={14} />
+                </div>
                 <textarea
                   autoFocus
                   value={tb.text}
-                  onChange={(e) => handleTextChange(tb.id, e.target.value)}
+                  onChange={(e) => handleTextUpdate(tb.id, { text: e.target.value })}
+                  onMouseUp={(e) => {
+                    const { offsetWidth, offsetHeight } = e.target;
+                    if (offsetWidth !== tb.width || offsetHeight !== tb.height) {
+                      handleTextUpdate(tb.id, { width: offsetWidth, height: offsetHeight });
+                    }
+                  }}
                   onMouseDown={(e) => e.stopPropagation()}
                   onPointerDown={(e) => e.stopPropagation()}
                   rows={2}
@@ -294,6 +474,8 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
                     fontSize: '0.9rem',
                     resize: 'both',
                     minWidth: '120px',
+                    width: tb.width ? `${tb.width}px` : 'auto',
+                    height: tb.height ? `${tb.height}px` : 'auto',
                     outline: 'none',
                     fontFamily: 'inherit',
                   }}
@@ -310,6 +492,8 @@ export default function Whiteboard({ isExplainer, color, size, tool, socket, roo
                 whiteSpace: 'pre-wrap',
                 minWidth: '120px',
                 maxWidth: '300px',
+                width: tb.width ? `${tb.width}px` : 'auto',
+                height: tb.height ? `${tb.height}px` : 'auto',
               }}>
                 {tb.text || ' '}
               </div>

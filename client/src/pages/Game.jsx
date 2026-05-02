@@ -3,16 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Whiteboard from '../components/Whiteboard';
 import ChatBox from '../components/ChatBox';
+import ColorWheel from '../components/ColorWheel';
 import { useSocket } from '../hooks/useSocket';
 import { useAudio } from '../hooks/useAudio';
 import { useSounds } from '../hooks/useSounds';
-import { Pen, Eraser, Trash2, Clock, Mic, MicOff, CheckCircle, Type, Users, XCircle } from 'lucide-react';
+import { 
+  Pen, Eraser, Trash2, Clock, Mic, MicOff, CheckCircle, Type, Users, XCircle,
+  Square, Circle as CircleIcon, Minus, ArrowRight
+} from 'lucide-react';
 
 export default function Game() {
   const { roomId } = useParams();
   const navigate = useNavigate();
   const [playerName] = useState(localStorage.getItem('playerName') || `Player ${Math.floor(Math.random() * 1000)}`);
-  const { socket, roomState, isConnected } = useSocket(roomId, playerName);
+  const { socket, roomState, isConnected } = useSocket(roomId, playerName, navigate);
 
   const explainerIndex = roomState && roomState.players.length > 0
     ? Math.max(0, roomState.currentExplainerIndex) % roomState.players.length
@@ -31,6 +35,7 @@ export default function Game() {
   const [tool, setTool] = useState('pen');
   const [showWordPopup, setShowWordPopup] = useState(false);
   const [doneCountdown, setDoneCountdown] = useState(null);
+  const [elasticity, setElasticity] = useState(0.3);
 
   const { play } = useSounds();
 
@@ -163,6 +168,10 @@ export default function Game() {
     if (socket && roomId) socket.emit('cancel_end_turn', { roomId });
   };
 
+  const handleSelectTopic = (t) => {
+    if (socket && roomId) socket.emit('topic:select', { roomId, topic: t });
+  };
+
   const topicWord = roomState?.topic?.term || roomState?.topic?.topic;
   const topicLabel = roomState?.topic
     ? `${roomState.topic.subject}${roomState.topic.subtopic ? ` · ${roomState.topic.subtopic}` : ''}`
@@ -170,6 +179,61 @@ export default function Game() {
 
   return (
     <div className="game-layout" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', height: '100vh', gap: '1rem' }}>
+
+      {/* Topic Selection Overlay */}
+      <AnimatePresence>
+        {roomState.status === 'selecting_topic' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 110,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+            }}
+          >
+            <div style={{ textAlign: 'center', maxWidth: '600px', width: '90%' }}>
+              <h2 style={{ fontSize: '1.2rem', color: 'var(--text-dim)', marginBottom: '2rem', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                {isExplainer ? 'Choose a topic to explain' : `${explainer?.name} is choosing a topic...`}
+              </h2>
+              
+              {isExplainer ? (
+                <div style={{ display: 'grid', gap: '1rem' }}>
+                  {roomState.topicChoices?.map((t, i) => (
+                    <motion.button
+                      key={i}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => handleSelectTopic(t)}
+                      className="glass-panel"
+                      style={{
+                        padding: '1.5rem', cursor: 'pointer', textAlign: 'left',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        transition: 'background 0.2s',
+                        background: 'rgba(255,255,255,0.03)'
+                      }}
+                    >
+                      <div style={{ fontSize: '0.7rem', color: 'var(--accent-blue)', textTransform: 'uppercase', marginBottom: '0.4rem' }}>{t.subject}</div>
+                      <div style={{ fontSize: '1.5rem', fontWeight: 'bold', color: 'var(--text-chalk)' }}>{t.term}</div>
+                    </motion.button>
+                  ))}
+                  <div style={{ marginTop: '1.5rem', color: 'var(--accent-yellow)', fontSize: '1.2rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
+                    {timeRemaining}s
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2rem' }}>
+                   <div className="spinner" style={{ width: '50px', height: '50px' }} />
+                   <div style={{ color: 'var(--accent-yellow)', fontSize: '1.5rem', fontWeight: 'bold', fontFamily: 'var(--font-mono)' }}>
+                     {timeRemaining}s
+                   </div>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Word reveal popup — shown for 3 seconds at round start */}
       <AnimatePresence>
@@ -309,13 +373,15 @@ export default function Game() {
       </header>
 
       {/* Main Content */}
-      <main style={{ display: 'flex', gap: '1rem', flex: 1, minHeight: 0, padding: '1rem', overflow: 'hidden' }}>
+      <main style={{ position: 'relative', display: 'flex', flex: 1, minHeight: 0, padding: '1.5rem', overflow: 'hidden' }}>
 
         {/* Toolbar (Explainer Only) */}
         {isExplainer && (
           <aside className="glass-panel" style={{
+            position: 'absolute', left: '2.5rem', top: '50%', transform: 'translateY(-50%)',
             width: '72px', padding: '1.5rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1.2rem',
-            borderRight: 'var(--border-chalk)', height: '100%', overflowY: 'auto'
+            zIndex: 100, borderRadius: '36px', boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+            border: '1px solid rgba(232, 245, 232, 0.15)', maxHeight: '85vh', overflowY: 'auto'
           }}>
             <button
               onClick={() => setTool('pen')}
@@ -338,6 +404,37 @@ export default function Game() {
             >
               <Type size={28} color={tool === 'text' ? '#5599e0' : 'var(--text-chalk)'} />
             </button>
+
+            <div style={{ width: '60%', height: '1px', background: 'rgba(232, 245, 232, 0.1)', margin: '0.2rem 0' }} />
+
+            <button
+              onClick={() => setTool('line')}
+              className={`tool-btn ${tool === 'line' ? 'active' : ''}`}
+              style={{ padding: '12px', background: tool === 'line' ? 'rgba(255, 255, 255, 0.1)' : 'transparent', borderRadius: '12px' }}
+            >
+              <Minus size={28} color={tool === 'line' ? 'var(--accent-yellow)' : 'var(--text-chalk)'} style={{ transform: 'rotate(-45deg)' }} />
+            </button>
+            <button
+              onClick={() => setTool('rect')}
+              className={`tool-btn ${tool === 'rect' ? 'active' : ''}`}
+              style={{ padding: '12px', background: tool === 'rect' ? 'rgba(255, 255, 255, 0.1)' : 'transparent', borderRadius: '12px' }}
+            >
+              <Square size={28} color={tool === 'rect' ? 'var(--accent-yellow)' : 'var(--text-chalk)'} />
+            </button>
+            <button
+              onClick={() => setTool('circle')}
+              className={`tool-btn ${tool === 'circle' ? 'active' : ''}`}
+              style={{ padding: '12px', background: tool === 'circle' ? 'rgba(255, 255, 255, 0.1)' : 'transparent', borderRadius: '12px' }}
+            >
+              <CircleIcon size={28} color={tool === 'circle' ? 'var(--accent-yellow)' : 'var(--text-chalk)'} />
+            </button>
+            <button
+              onClick={() => setTool('arrow')}
+              className={`tool-btn ${tool === 'arrow' ? 'active' : ''}`}
+              style={{ padding: '12px', background: tool === 'arrow' ? 'rgba(255, 255, 255, 0.1)' : 'transparent', borderRadius: '12px' }}
+            >
+              <ArrowRight size={28} color={tool === 'arrow' ? 'var(--accent-yellow)' : 'var(--text-chalk)'} style={{ transform: 'rotate(-45deg)' }} />
+            </button>
             <button
               onClick={() => { if (socket && roomId) socket.emit('stroke:clear', { roomId }); }}
               className="tool-btn"
@@ -348,20 +445,18 @@ export default function Game() {
 
             <div style={{ width: '60%', height: '1px', background: 'rgba(232, 245, 232, 0.1)', margin: '0.5rem 0' }} />
 
-            {/* Colors */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {colors.map(c => (
-                <button
-                  key={c.hex}
-                  onClick={() => { setColor(c.hex); setTool('pen'); }}
-                  style={{
-                    width: '32px', height: '32px', borderRadius: '50%', backgroundColor: c.hex,
-                    border: color === c.hex && tool === 'pen' ? '3px solid white' : '1px solid rgba(255,255,255,0.2)',
-                    boxShadow: color === c.hex && tool === 'pen' ? `0 0 12px ${c.hex}` : 'none',
-                    transition: 'all 0.2s ease'
-                  }}
-                />
-              ))}
+            {/* Color Wheel */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 'bold' }}>Color</div>
+              <ColorWheel 
+                color={color} 
+                onChange={(hex) => { setColor(hex); if (tool === 'eraser') setTool('pen'); }} 
+                size={56} 
+              />
+              <div style={{ 
+                width: '32px', height: '12px', borderRadius: '4px', background: color, 
+                border: '1px solid rgba(255,255,255,0.2)', boxShadow: `0 0 8px ${color}44` 
+              }} />
             </div>
 
             <div style={{ width: '60%', height: '1px', background: 'rgba(232, 245, 232, 0.1)', margin: '0.5rem 0' }} />
@@ -382,6 +477,24 @@ export default function Game() {
                 </button>
               ))}
             </div>
+
+            <div style={{ width: '60%', height: '1px', background: 'rgba(232, 245, 232, 0.1)', margin: '0.5rem 0' }} />
+
+            {/* Elasticity Slider (Flow) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', width: '100%', alignItems: 'center' }}>
+              <div style={{ fontSize: '0.6rem', color: 'var(--text-dim)', textTransform: 'uppercase', fontWeight: 'bold' }}>Flow</div>
+              <div style={{ height: '60px', position: 'relative', display: 'flex', alignItems: 'center' }}>
+                <input 
+                  type="range" min="0" max="0.8" step="0.1" 
+                  value={elasticity} 
+                  onChange={(e) => setElasticity(parseFloat(e.target.value))}
+                  style={{ 
+                    width: '50px', height: '4px', transform: 'rotate(-90deg)', 
+                    accentColor: 'var(--accent-yellow)', cursor: 'pointer'
+                  }}
+                />
+              </div>
+            </div>
           </aside>
         )}
 
@@ -397,6 +510,7 @@ export default function Game() {
               roomId={roomId}
               roomState={roomState}
               onToolChange={(t) => setTool(t)}
+              elasticity={elasticity}
             />
             {isExplainer && (
               <div style={{ position: 'absolute', bottom: '20px', left: '20px', pointerEvents: 'none' }}>
@@ -440,24 +554,43 @@ export default function Game() {
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: '1.5rem', width: '100%', justifyContent: 'center' }}>
                 <span style={{ color: 'var(--text-chalk)', fontSize: '1rem', fontWeight: '500' }}>Rate:</span>
-                <div style={{ display: 'flex', gap: '0.6rem' }}>
-                  {[1, 2, 3, 4, 5].map(score => (
-                    <button
-                      key={score}
-                      onClick={() => submitScore(score)}
-                      className={`score-btn ${roomState.roundScores?.[socket.id] === score ? 'active' : ''}`}
-                      style={{
-                        width: '48px', height: '48px', borderRadius: '12px', fontSize: '1.2rem', fontWeight: 'bold',
-                        border: '2px solid rgba(232, 245, 232, 0.2)',
-                        background: roomState.roundScores?.[socket.id] === score ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.05)',
-                        color: roomState.roundScores?.[socket.id] === score ? 'black' : 'white',
-                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)', cursor: 'pointer'
-                      }}
-                    >
-                      {score}
-                    </button>
-                  ))}
+                <div style={{ display: 'flex', gap: '0.8rem' }}>
+                  {[1, 2, 3, 4, 5].map(score => {
+                    const hasVoted = roomState.roundScores?.[socket.id] !== undefined;
+                    const isSelected = roomState.roundScores?.[socket.id] === score;
+                    return (
+                      <button
+                        key={score}
+                        disabled={hasVoted}
+                        onClick={() => submitScore(score)}
+                        style={{
+                          width: '56px', height: '56px', borderRadius: '14px', fontSize: '1.4rem', fontWeight: 'bold',
+                          border: isSelected ? '2px solid #ffffff' : '2px solid rgba(232, 245, 232, 0.15)',
+                          background: isSelected ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.05)',
+                          color: isSelected ? '#1e2e1e' : 'var(--text-chalk)',
+                          transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)', 
+                          cursor: hasVoted ? 'default' : 'pointer',
+                          transform: isSelected ? 'scale(1.15)' : 'scale(1)',
+                          boxShadow: isSelected ? '0 10px 25px rgba(245, 200, 66, 0.4)' : 'none',
+                          opacity: hasVoted && !isSelected ? 0.3 : 1
+                        }}
+                        onMouseEnter={e => !hasVoted && (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+                        onMouseLeave={e => !hasVoted && (e.currentTarget.style.background = 'rgba(255,255,255,0.05)')}
+                      >
+                        {score}
+                      </button>
+                    );
+                  })}
                 </div>
+                {roomState.roundScores?.[socket.id] !== undefined && (
+                  <div style={{ 
+                    background: 'rgba(245, 200, 66, 0.15)', padding: '0.4rem 1rem', borderRadius: '20px',
+                    color: 'var(--accent-yellow)', fontSize: '0.85rem', fontWeight: 'bold',
+                    border: '1px solid var(--accent-yellow)', animation: 'fadeIn 0.5s ease-out'
+                  }}>
+                    SCORE SUBMITTED
+                  </div>
+                )}
               </div>
             )}
           </div>

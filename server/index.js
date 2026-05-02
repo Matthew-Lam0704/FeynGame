@@ -83,7 +83,7 @@ const io = new Server(server, {
 });
 
 app.post('/rooms', roomLimiter, (req, res) => {
-  const { roomId, name, isPublic, maxPlayers, roundDuration, roundsPerPlayer, subject, subtopic } = req.body;
+  const { roomId, name, isPublic, maxPlayers, roundDuration, roundsPerPlayer, subject, subtopic, customWords } = req.body;
   if (typeof roomId !== 'string' || !/^[A-Z0-9]{1,20}$/.test(roomId)) {
     return res.status(400).json({ error: 'Invalid roomId' });
   }
@@ -97,10 +97,22 @@ app.post('/rooms', roomLimiter, (req, res) => {
     ? roundsPerPlayer : 1;
   const safeSubject = typeof subject === 'string' ? subject : null;
   const safeSubtopic = typeof subtopic === 'string' ? subtopic : null;
+  const safeCustomWords = Array.isArray(customWords) ? customWords.filter(w => typeof w === 'string').map(w => w.slice(0, 50)) : [];
+  const safeDifficulty = ['easy', 'normal', 'hard'].includes(difficulty) ? difficulty : 'normal';
 
   let room = getRoom(roomId);
   if (!room) {
-    createRoom(roomId, { name: safeName, isPublic: safePublic, maxPlayers: safeMax, roundDuration: safeRoundDuration, roundsPerPlayer: safeRoundsPerPlayer, subject: safeSubject, subtopic: safeSubtopic });
+    createRoom(roomId, { 
+      name: safeName, 
+      isPublic: safePublic, 
+      maxPlayers: safeMax, 
+      roundDuration: safeRoundDuration, 
+      roundsPerPlayer: safeRoundsPerPlayer, 
+      subject: safeSubject, 
+      subtopic: safeSubtopic,
+      customWords: safeCustomWords,
+      difficulty: safeDifficulty
+    });
   } else if (room.status === 'lobby') {
     // Overwrite defaults if room was auto-created by socket join
     room.name = safeName;
@@ -110,6 +122,8 @@ app.post('/rooms', roomLimiter, (req, res) => {
     room.roundsPerPlayer = safeRoundsPerPlayer;
     room.subject = safeSubject;
     room.subtopic = safeSubtopic;
+    room.customWords = safeCustomWords;
+    room.difficulty = safeDifficulty;
     room.timer = safeRoundDuration;
     console.log(`[ROOM UPDATE] Room: ${roomId}, Duration: ${room.roundDuration}, Subject: ${room.subject}`);
     io.to(roomId).emit('room_state_update', room);
@@ -128,7 +142,7 @@ app.get('/subjects', (_req, res) => {
 app.get('/rooms', (_req, res) => {
   const publicRooms = [];
   getAllRooms().forEach((room) => {
-    if (room.isPublic && room.status === 'lobby') {
+    if (room.isPublic && room.status !== 'results') {
       publicRooms.push({
         id: room.id,
         name: room.name,
@@ -136,10 +150,17 @@ app.get('/rooms', (_req, res) => {
         maxPlayers: room.maxPlayers,
         subject: room.subject,
         subtopic: room.subtopic,
+        status: room.status,
       });
     }
   });
   res.json(publicRooms);
+});
+
+app.get('/rooms/:roomId', (req, res) => {
+  const room = getRoom(req.params.roomId);
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  res.json({ exists: true, status: room.status });
 });
 
 app.post('/delete-account', async (req, res) => {
@@ -237,6 +258,33 @@ io.on('connection', (socket) => {
     if (typeof ack === 'function') ack({ ok: true });
   });
 
+  socket.on('leave_room', ({ roomId }) => {
+    if (typeof roomId !== 'string') return;
+    const room = getRoom(roomId);
+    if (!room) return;
+    
+    const playerIndex = room.players.findIndex(p => p.id === socket.id);
+    if (playerIndex === -1) return;
+    
+    const player = room.players[playerIndex];
+    room.players.splice(playerIndex, 1);
+    socket.leave(roomId);
+    
+    if (room.players.length === 0) {
+      deleteRoom(roomId);
+    } else {
+      if (player.isHost) {
+        if (room.status === 'results') {
+          io.to(roomId).emit('room_dissolved');
+          deleteRoom(roomId);
+          return;
+        }
+        room.players[0].isHost = true;
+      }
+      io.to(roomId).emit('room_state_update', room);
+    }
+  });
+
   socket.on('join_room', ({ roomId, playerName }) => {
     if (typeof roomId !== 'string' || roomId.length > 20) return;
     let safeName = typeof playerName === 'string'
@@ -248,11 +296,21 @@ io.on('connection', (socket) => {
 
     let room = getRoom(roomId);
     if (!room) {
-      room = createRoom(roomId);
+      socket.emit('join_error', { code: 'ROOM_NOT_FOUND' });
+      return;
     }
 
     let player = room.players.find(p => p.id === socket.id);
     if (!player) {
+      // Prevent duplicates on reconnect: remove any stale record with same userId or name
+      const staleIdx = room.players.findIndex(p => 
+        (socket.data.userId && p.userId === socket.data.userId) || 
+        (!socket.data.userId && p.name === safeName && p.id !== socket.id)
+      );
+      if (staleIdx !== -1) {
+        room.players.splice(staleIdx, 1);
+      }
+
       player = {
         id: socket.id,
         userId: socket.data.userId || null,
@@ -265,6 +323,19 @@ io.on('connection', (socket) => {
         roundsPlayed: 0,
       };
       room.players.push(player);
+    }
+
+    if (room.status === 'results') {
+      room.status = 'lobby';
+      room.players.forEach(p => {
+        p.score = 0;
+        p.avgScore = 0;
+        p.totalPoints = 0;
+        p.roundsPlayed = 0;
+        p.isReady = false;
+      });
+      room.currentExplainerIndex = -1;
+      room.coinsAwarded = false;
     }
 
     io.to(roomId).emit('room_state_update', room);
@@ -286,8 +357,10 @@ io.on('connection', (socket) => {
     if (typeof roomId !== 'string') return;
     const room = getRoom(roomId);
     if (room && room.players.find(p => p.id === socket.id)?.isHost) {
+      if (room.status !== 'lobby') return; // only start from lobby
       console.log(`[START GAME] Room: ${roomId}, Duration: ${room.roundDuration}, Subject: ${room.subject}`);
       room.currentExplainerIndex = -1;
+      // Freeze the round count based on players present at start
       room.totalRounds = room.players.length * (room.roundsPerPlayer || 1);
       startNextRound(io, roomId);
     }
@@ -366,6 +439,24 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('topic:select', ({ roomId, topic }) => {
+    if (typeof roomId !== 'string') return;
+    const room = getRoom(roomId);
+    if (!room || room.status !== 'selecting_topic') return;
+    
+    // Security: only the explainer can pick
+    const explainerIndex = room.currentExplainerIndex % room.players.length;
+    if (room.players[explainerIndex]?.id !== socket.id) return;
+
+    room.topic = topic;
+    require('./gameLoop').startExplaining(io, roomId);
+  });
+
+  socket.on('shape:draw', ({ roomId, type, x1, y1, x2, y2, color, size }) => {
+    if (typeof roomId !== 'string') return;
+    socket.to(roomId).emit('shape:replay', { type, x1, y1, x2, y2, color, size });
+  });
+
   socket.on('textbox:add', ({ roomId, id, x, y, text }) => {
     if (typeof roomId !== 'string') return;
     const room = getRoom(roomId);
@@ -379,17 +470,25 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('textbox:add', newBox);
   });
 
-  socket.on('textbox:update', ({ roomId, id, text }) => {
-    if (typeof roomId !== 'string') return;
+  socket.on('textbox:update', ({ roomId, id, text, width, height }) => {
+    if (typeof roomId !== 'string' || typeof id !== 'string') return;
     const room = getRoom(roomId);
     if (!room) return;
 
-    room.textBoxes = (room.textBoxes || []).map(tb => 
-      tb.id === id ? { ...tb, text: text.slice(0, 500) } : tb
-    );
+    room.textBoxes = (room.textBoxes || []).map(tb => {
+      if (tb.id === id) {
+        return { 
+          ...tb, 
+          text: text !== undefined ? text.slice(0, 500) : tb.text,
+          width: width !== undefined ? width : tb.width,
+          height: height !== undefined ? height : tb.height
+        };
+      }
+      return tb;
+    });
     
     io.to(roomId).emit('room_state_update', room);
-    socket.to(roomId).emit('textbox:update', { id, text: text.slice(0, 500) });
+    socket.to(roomId).emit('textbox:update', { id, text, width, height });
   });
 
   socket.on('textbox:delete', ({ roomId, id }) => {
@@ -410,8 +509,9 @@ io.on('connection', (socket) => {
 
     const room = getRoom(roomId);
     if (room && room.status === 'playing') {
-      const explainer = room.players[room.currentExplainerIndex];
+      const explainer = room.players[room.currentExplainerIndex % room.players.length];
       if (explainer && explainer.id === socket.id) return;
+      if (room.roundScores.hasOwnProperty(socket.id)) return; // already voted
       room.roundScores[socket.id] = validScore;
       io.to(roomId).emit('room_state_update', room);
     }
