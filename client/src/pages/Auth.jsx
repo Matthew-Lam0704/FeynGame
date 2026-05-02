@@ -67,35 +67,44 @@ export default function Auth() {
     }
 
     setIsSubmitting(true);
-    console.log('Submitting login/signup...', { isLogin, email });
+    console.log('[Auth] Submitting login/signup...', { isLogin, email });
+    
+    // Safety timeout: if login hangs for 15s, allow the user to try again
+    const safetyTimeout = setTimeout(() => {
+      console.warn('[Auth] Login/Signup submission timed out');
+      setIsSubmitting(false);
+      setError('Connection timed out. Please try again.');
+    }, 15000);
+
     try {
       if (isLogin) {
-        console.log('Calling signInWithPassword...');
+        console.log('[Auth] Calling signInWithPassword...');
         const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
         if (authError) {
-          console.error('Login error:', authError);
+          console.error('[Auth] Login error returned:', authError);
           throw authError;
         }
-        // Navigation is handled by the useEffect above once hydrate() sets the user in the store.
+        console.log('[Auth] signInWithPassword resolved successfully');
       } else {
-        console.log('Calling signUp...');
+        console.log('[Auth] Calling signUp...');
         const { error: authError } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { username } },
         });
         if (authError) {
-          console.error('Signup error:', authError);
+          console.error('[Auth] Signup error returned:', authError);
           throw authError;
         }
-        console.log('Signup successful, check email');
+        console.log('[Auth] signUp resolved successfully');
         setSuccessMsg('Check your email to confirm your account, then log in.');
       }
     } catch (err) {
-      console.error('Form submission caught error:', err);
+      console.error('[Auth] Form submission caught error:', err);
       setError(err.message);
     } finally {
-      console.log('Form submission finished, setting isSubmitting to false');
+      clearTimeout(safetyTimeout);
+      console.log('[Auth] Form submission finished, setting isSubmitting to false');
       setIsSubmitting(false);
     }
   };

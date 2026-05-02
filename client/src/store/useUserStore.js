@@ -148,28 +148,60 @@ export const useUserStore = create((set, get) => ({
       }
     }, 5000);
 
-    const hydrate = async (user) => {
+    let lastHydrateId = null;
+
+    const hydrate = async (user, event) => {
+      if (!user) return;
+      
+      // If we're already loading this exact user, skip unless it's a specific event that requires refresh
+      if (get().user?.id === user.id && get().isLoading && event !== 'SIGNED_IN') {
+        return;
+      }
+
+      const currentHydrateId = Math.random();
+      lastHydrateId = currentHydrateId;
+      
+      console.log(`Hydrating user: ${user.id} (Event: ${event})`);
       set({ isLoading: true });
-      bootstrapAvatar(user).catch(err => console.error('Non-fatal avatar bootstrap error:', err));
-      localStorage.setItem('playerName', derivePlayerName(user));
-      const profileFields = await fetchProfile(user);
-      set({
-        user,
-        profile: { ...profileFields, avatarUrl: defaultAvatarUrl(user) },
-        isGuest: false,
-        isLoading: false,
-      });
-      registerUserOnSocket().catch(err => console.error('register_user emit failed:', err));
+
+      try {
+        // Run avatar bootstrap in background
+        bootstrapAvatar(user).catch(err => console.error('Non-fatal avatar bootstrap error:', err));
+        
+        localStorage.setItem('playerName', derivePlayerName(user));
+        
+        const profileFields = await fetchProfile(user);
+        
+        // Check if a newer hydration has started
+        if (lastHydrateId !== currentHydrateId) {
+          console.log('Newer hydration in progress, discarding this result');
+          return;
+        }
+
+        set({
+          user,
+          profile: { ...profileFields, avatarUrl: defaultAvatarUrl(user) },
+          isGuest: false,
+          isLoading: false,
+        });
+
+        registerUserOnSocket().catch(err => console.error('register_user emit failed:', err));
+      } catch (err) {
+        console.error('Hydration failed:', err);
+        if (lastHydrateId === currentHydrateId) {
+          set({ isLoading: false });
+        }
+      }
     };
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(timeout);
       const user = session?.user ?? null;
       if (user) {
-        console.log('Session retrieved successfully:', user.id);
-        await hydrate(user);
+        console.log('Initial session retrieved:', user.id);
+        hydrate(user, 'INITIAL_SESSION');
       } else {
-        console.log('No active session found');
+        console.log('No initial session found');
         set({ user: null, profile: null, isLoading: false });
       }
     }).catch((err) => {
@@ -177,11 +209,15 @@ export const useUserStore = create((set, get) => ({
       set({ user: null, profile: null, isLoading: false });
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user ?? null;
       console.log('Auth state changed:', _event, user?.id);
+      
       if (user) {
-        await hydrate(user);
+        // Fire and forget, don't await here as it might block Supabase internal emitter
+        hydrate(user, _event);
+      } else if (_event === 'SIGNED_OUT') {
+        set({ user: null, profile: null, isGuest: false, isLoading: false });
       } else {
         set({ user: null, profile: null, isLoading: false });
       }
