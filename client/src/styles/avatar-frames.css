@@ -1,0 +1,104 @@
+/* Avatar frame visuals. Each frame is a circular wrapper applied to <AvatarFrame>.
+   The wrapper is a fixed circle that holds <img> as its only child; frames
+   express themselves through border, box-shadow, background (with padding for
+   conic-gradient rings), or animated pseudo-elements. */
+
+.avatar-frame {
+  position: relative;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-light);
+  box-sizing: border-box;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.avatar-frame > img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Frames that paint a gradient as the "ring" need padding so the inner img
+   doesn't cover it. The img keeps its own border-radius so the gradient shows
+   as a ring through the gap. */
+.avatar-frame.has-ring {
+  padding: 3px;
+  overflow: visible;
+}
+
+/* No frame — keep a subtle yellow ring so unstyled users still look intentional. */
+.frame-none {
+  border: 2px solid var(--accent-yellow);
+}
+
+.frame-gold-ring {
+  border: 4px solid #f5c842;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+
+.frame-crimson-glow {
+  border: 3px solid #e05555;
+  box-shadow: 0 0 18px rgba(224, 85, 85, 0.7), 0 0 4px rgba(224, 85, 85, 0.9) inset;
+}
+
+.frame-ocean-pulse {
+  border: 3px solid #5599e0;
+  animation: oceanPulse 2.4s ease-in-out infinite;
+}
+@keyframes oceanPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(85, 153, 224, 0.5); }
+  50%      { box-shadow: 0 0 22px rgba(85, 153, 224, 1); }
+}
+
+.frame-aurora {
+  background: conic-gradient(from 0deg, #5599e0, #b478ff, #ff78c8, #f5c842, #78ffd1, #5599e0);
+  animation: auroraSpin 6s linear infinite;
+}
+@keyframes auroraSpin {
+  to { transform: rotate(360deg); }
+}
+/* Counter-rotate the inner image so the avatar stays upright while the ring spins. */
+.frame-aurora > img {
+  animation: auroraSpin 6s linear infinite reverse;
+}
+
+.frame-sunset {
+  background: linear-gradient(135deg, #ff7e3f 0%, #ff4f8a 50%, #b13bd9 100%);
+  box-shadow: 0 0 14px rgba(255, 79, 138, 0.55);
+}
+
+.frame-royal-velvet {
+  border: 3px solid #4b1d8c;
+  box-shadow:
+    0 0 0 2px #f5c842 inset,
+    0 0 16px rgba(75, 29, 140, 0.7);
+  animation: velvetShimmer 3.5s ease-in-out infinite;
+}
+@keyframes velvetShimmer {
+  0%, 100% { box-shadow: 0 0 0 2px #f5c842 inset, 0 0 16px rgba(75, 29, 140, 0.7); }
+  50%      { box-shadow: 0 0 0 2px #ffd86b inset, 0 0 24px rgba(150, 80, 220, 0.9); }
+}
+
+.frame-holo {
+  background: conic-gradient(
+    from 0deg,
+    #ff78c8 0deg,
+    #78d8ff 60deg,
+    #b8ff78 120deg,
+    #ffd078 180deg,
+    #ff78c8 240deg,
+    #b478ff 300deg,
+    #ff78c8 360deg
+  );
+  animation: holoSpin 4s linear infinite;
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.4);
+}
+@keyframes holoSpin {
+  to { transform: rotate(360deg); }
+}
+.frame-holo > img {
+  animation: holoSpin 4s linear infinite reverse;
+}

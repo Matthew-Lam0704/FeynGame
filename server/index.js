@@ -7,17 +7,39 @@ const { AccessToken } = require('livekit-server-sdk');
 const { createRoom, getRoom, deleteRoom, getAllRooms } = require('./rooms');
 const { startNextRound, endRound } = require('./gameLoop');
 const { wordBank } = require('./topics');
+const { getFrame } = require('./frames');
 const filter = require('leo-profanity');
 filter.loadDictionary('en');
 
 const { createClient } = require('@supabase/supabase-js');
 
-// Supabase admin client (optional — only for account deletion)
+// Supabase admin client (used for account deletion, coin awards, and frame purchases)
 const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
   ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
       auth: { autoRefreshToken: false, persistSession: false },
     })
   : null;
+
+// Verifies a Bearer token from the Authorization header and returns the user.
+// Returns { user } on success, or { status, error } on failure (so the caller
+// can forward straight to res.status(...).json(...)).
+const verifyBearer = async (req) => {
+  if (!supabaseAdmin) {
+    return { status: 503, error: 'Supabase admin client not configured' };
+  }
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith('Bearer ')) {
+    return { status: 401, error: 'Missing authorization header' };
+  }
+  const token = auth.slice(7);
+  // getUser() actually verifies the JWT signature against Supabase's keys —
+  // unlike a raw base64 decode, this rejects forged tokens.
+  const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+  if (error || !user) {
+    return { status: 401, error: 'Invalid or expired token' };
+  }
+  return { user };
+};
 
 // Fail fast if credentials are missing — do not run with insecure defaults
 const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY;
@@ -121,44 +143,53 @@ app.get('/rooms', (_req, res) => {
 });
 
 app.post('/delete-account', async (req, res) => {
-  if (!supabaseAdmin) {
-    return res.status(503).json({ error: 'Account deletion not configured — add SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY to Railway env vars.' });
-  }
+  const auth = await verifyBearer(req);
+  if (auth.error) return res.status(auth.status).json({ error: auth.error });
 
-  const auth = req.headers.authorization;
-  if (!auth || !auth.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing authorization header' });
-  }
-
-  // Decode JWT payload to extract user ID (Supabase JWTs are RS256-signed)
-  let userId;
-  try {
-    const payload = JSON.parse(
-      Buffer.from(auth.slice(7).split('.')[1], 'base64url').toString('utf8')
-    );
-    userId = payload.sub;
-    if (!userId) throw new Error('no sub');
-    // Reject clearly expired tokens
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return res.status(401).json({ error: 'Token has expired — please sign in again' });
-    }
-  } catch {
-    return res.status(401).json({ error: 'Invalid token format' });
-  }
-
-  // Verify user actually exists before deleting
-  const { data: { user }, error: lookupError } = await supabaseAdmin.auth.admin.getUserById(userId);
-  if (lookupError || !user) {
-    return res.status(401).json({ error: 'User not found' });
-  }
-
-  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(auth.user.id);
   if (deleteError) {
     console.error('delete-account error:', deleteError);
     return res.status(500).json({ error: deleteError.message });
   }
 
   res.json({ success: true });
+});
+
+app.post('/api/purchase-frame', async (req, res) => {
+  const auth = await verifyBearer(req);
+  if (auth.error) return res.status(auth.status).json({ error: auth.error });
+
+  const { frameId } = req.body || {};
+  if (typeof frameId !== 'string') {
+    return res.status(400).json({ error: 'Missing frameId' });
+  }
+  const frame = getFrame(frameId);
+  if (!frame) {
+    return res.status(400).json({ error: 'Unknown frame' });
+  }
+  if (frame.price <= 0) {
+    return res.status(400).json({ error: 'Frame is not purchasable' });
+  }
+
+  const { data, error } = await supabaseAdmin.rpc('purchase_frame', {
+    p_user: auth.user.id,
+    p_frame_id: frame.id,
+    p_price: frame.price,
+  });
+
+  if (error) {
+    // RPC raises with a human-readable message on insufficient coins / already owned.
+    const msg = error.message || '';
+    if (/insufficient coins/i.test(msg)) return res.status(400).json({ error: 'Insufficient coins' });
+    if (/already owned/i.test(msg))      return res.status(400).json({ error: 'Frame already owned' });
+    if (/profile not found/i.test(msg))  return res.status(404).json({ error: 'Profile not found' });
+    console.error('purchase_frame rpc error:', error);
+    return res.status(500).json({ error: 'Purchase failed' });
+  }
+
+  // Postgres `returns table` comes back as an array; we want the single row.
+  const row = Array.isArray(data) ? data[0] : data;
+  res.json({ coins: row?.coins, ownedFrames: row?.owned_frames ?? [] });
 });
 
 app.get('/token', tokenLimiter, async (req, res) => {
@@ -184,6 +215,28 @@ app.get('/token', tokenLimiter, async (req, res) => {
 });
 
 io.on('connection', (socket) => {
+  // Authenticated clients call this once on connect; the verified Supabase user
+  // id is then attached to the player record on join_room so server-side coin
+  // awards know who to credit. Guests skip this step entirely.
+  socket.on('register_user', async ({ accessToken }, ack) => {
+    if (!supabaseAdmin || typeof accessToken !== 'string') {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(accessToken);
+    if (error || !user) {
+      if (typeof ack === 'function') ack({ ok: false });
+      return;
+    }
+    socket.data.userId = user.id;
+    // Patch any existing player records this socket already owns.
+    getAllRooms().forEach((room) => {
+      const player = room.players.find(p => p.id === socket.id);
+      if (player) player.userId = user.id;
+    });
+    if (typeof ack === 'function') ack({ ok: true });
+  });
+
   socket.on('join_room', ({ roomId, playerName }) => {
     if (typeof roomId !== 'string' || roomId.length > 20) return;
     let safeName = typeof playerName === 'string'
@@ -202,6 +255,7 @@ io.on('connection', (socket) => {
     if (!player) {
       player = {
         id: socket.id,
+        userId: socket.data.userId || null,
         name: safeName,
         isReady: false,
         isHost: room.players.length === 0,

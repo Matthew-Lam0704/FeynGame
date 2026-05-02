@@ -1,5 +1,46 @@
+const { createClient } = require('@supabase/supabase-js');
 const { getRandomWord } = require('./topics');
 const { getRoom } = require('./rooms');
+
+const COINS_PER_POINT = 5;
+
+// Lazily-initialised admin client. Mirrors server/index.js — if the env vars
+// aren't set, we skip awards entirely (e.g. local dev without Supabase).
+let supabaseAdmin = null;
+const getAdmin = () => {
+  if (supabaseAdmin) return supabaseAdmin;
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
+  supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  return supabaseAdmin;
+};
+
+// Awards coins to every authenticated player in the room. Idempotent at the
+// room level via room.coinsAwarded — startNextRound only transitions to
+// 'results' once, but this guards against any future re-entry.
+const awardCoinsForRoom = async (room) => {
+  if (room.coinsAwarded) return;
+  room.coinsAwarded = true;
+
+  const admin = getAdmin();
+  if (!admin) return;
+
+  await Promise.all(room.players.map(async (player) => {
+    if (!player.userId) return;
+    const amount = Math.round((player.totalPoints || 0) * COINS_PER_POINT);
+    if (amount <= 0) return;
+    const { error } = await admin.rpc('award_coins', {
+      p_user: player.userId,
+      p_amount: amount,
+    });
+    if (error) {
+      console.error(`[AWARD] Failed for user ${player.userId}:`, error.message);
+    } else {
+      console.log(`[AWARD] +${amount} coins to user ${player.userId} in room ${room.id}`);
+    }
+  }));
+};
 
 const startNextRound = (io, roomId) => {
   const room = getRoom(roomId);
@@ -13,6 +54,7 @@ const startNextRound = (io, roomId) => {
 
   if (room.currentExplainerIndex >= (room.totalRounds || room.players.length)) {
     room.status = 'results';
+    awardCoinsForRoom(room).catch(err => console.error('[AWARD] unexpected error:', err));
     io.to(roomId).emit('room_state_update', room);
     return;
   }

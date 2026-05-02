@@ -4,6 +4,7 @@ import { LogOut, Settings, Coins, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/useUserStore';
 import SettingsModal from './SettingsModal';
+import AvatarFrame from './AvatarFrame';
 
 export default function ProfileHUD() {
   const [isOpen, setIsOpen] = useState(false);
@@ -46,12 +47,7 @@ export default function ProfileHUD() {
           borderRadius: '40px', cursor: 'pointer', boxShadow: 'var(--shadow-md)'
         }}
       >
-        <div style={{ 
-          width: '44px', height: '44px', borderRadius: '50%', overflow: 'hidden', 
-          border: '2px solid var(--accent-yellow)', background: 'var(--bg-light)'
-        }}>
-          <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        </div>
+        <AvatarFrame size={44} src={avatarUrl} frameId={profile?.selectedFrameId} alt="Avatar" />
         <div style={{ textAlign: 'left' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <div style={{ fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--text-chalk)' }}>{username}</div>
@@ -94,12 +90,8 @@ export default function ProfileHUD() {
               }}
             >
               <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                <div style={{ 
-                  width: '100px', height: '100px', borderRadius: '50%', margin: '0 auto 1rem',
-                  border: '3px solid var(--accent-yellow)', overflow: 'hidden', background: 'var(--bg-light)',
-                  boxShadow: '0 10px 20px rgba(0,0,0,0.3)'
-                }}>
-                  <img src={avatarUrl} alt="Large Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{ margin: '0 auto 1rem', filter: 'drop-shadow(0 10px 20px rgba(0,0,0,0.3))', display: 'flex', justifyContent: 'center' }}>
+                  <AvatarFrame size={100} src={avatarUrl} frameId={profile?.selectedFrameId} alt="Large Avatar" />
                 </div>
                 <h3 style={{ fontSize: '1.4rem', color: 'var(--text-chalk)' }}>{username}</h3>
                 <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>

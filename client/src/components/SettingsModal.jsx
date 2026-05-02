@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Volume2, Trash2, Mic, AlertTriangle } from 'lucide-react';
+import { X, Volume2, Trash2, Mic, AlertTriangle, ShoppingBag, Coins, Check } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/useUserStore';
 import { supabase } from '../lib/supabase';
+import { FRAMES } from '../lib/frames';
+import AvatarFrame from './AvatarFrame';
 
 const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 // Guard against missing protocol (e.g. Vercel dashboard env var without https://)
 const SERVER_URL = rawServerUrl.startsWith('http') ? rawServerUrl : `https://${rawServerUrl}`;
 const NAV = [
   { id: 'audio', Icon: Volume2, label: 'Audio' },
+  { id: 'shop', Icon: ShoppingBag, label: 'Shop' },
 ];
 
 export default function SettingsModal({ isOpen, onClose }) {
@@ -25,7 +28,7 @@ export default function SettingsModal({ isOpen, onClose }) {
   const [volume, setVolume] = useState(() => parseInt(localStorage.getItem('masterVolume') || '80', 10));
   const [audioPermissionDenied, setAudioPermissionDenied] = useState(false);
 
-  const { user, profile, logout } = useUserStore();
+  const { user, profile, logout, purchaseFrame, setSelectedFrame } = useUserStore();
   const navigate = useNavigate();
 
   const username = user?.user_metadata?.username || user?.email?.split('@')[0] || 'Player';
@@ -127,13 +130,8 @@ export default function SettingsModal({ isOpen, onClose }) {
             }}>
               {/* Avatar + user */}
               <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-                <div style={{
-                  width: '72px', height: '72px', borderRadius: '50%',
-                  margin: '0 auto 0.75rem',
-                  border: '2px solid var(--accent-yellow)',
-                  overflow: 'hidden', background: 'var(--bg-light)',
-                }}>
-                  <img src={avatarUrl} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem' }}>
+                  <AvatarFrame size={72} src={avatarUrl} frameId={profile?.selectedFrameId} alt="Avatar" />
                 </div>
                 <div style={{ fontWeight: 700, color: 'var(--text-chalk)', fontSize: '0.95rem' }}>{username}</div>
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>{user?.email}</div>
@@ -184,6 +182,16 @@ export default function SettingsModal({ isOpen, onClose }) {
                       onInputChange={handleInputChange}
                       onOutputChange={handleOutputChange}
                       onVolumeChange={handleVolumeChange}
+                    />
+                  )}
+                  {section === 'shop' && (
+                    <ShopSection
+                      avatarUrl={avatarUrl}
+                      tokens={profile?.tokens ?? 0}
+                      ownedFrames={profile?.ownedFrames ?? []}
+                      selectedFrameId={profile?.selectedFrameId ?? null}
+                      onPurchase={purchaseFrame}
+                      onEquip={setSelectedFrame}
                     />
                   )}
                   {section === 'manage' && (
@@ -425,6 +433,133 @@ function ManageSection({ username, email, deleteStep, setDeleteStep, isDeleting,
         >
           Delete Account
         </motion.button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Shop Section ── */
+function ShopSection({ avatarUrl, tokens, ownedFrames, selectedFrameId, onPurchase, onEquip }) {
+  const [busyId, setBusyId] = useState(null);
+  const [error, setError] = useState('');
+
+  const handleBuy = async (frameId) => {
+    setBusyId(frameId);
+    setError('');
+    const res = await onPurchase(frameId);
+    setBusyId(null);
+    if (!res.ok) setError(res.error);
+  };
+
+  const handleEquip = async (frameId) => {
+    setBusyId(frameId);
+    setError('');
+    const res = await onEquip(frameId);
+    setBusyId(null);
+    if (!res.ok) setError(res.error);
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '1rem' }}>
+        <div>
+          <h2 style={{ fontSize: '1.4rem', color: 'var(--text-chalk)', marginBottom: '0.4rem' }}>Avatar Frames</h2>
+          <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+            Earn coins by playing — spend them on cosmetic frames for your avatar.
+          </p>
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.5rem',
+          padding: '0.5rem 0.9rem', borderRadius: '999px',
+          background: 'rgba(245, 200, 66, 0.12)', border: '1px solid rgba(245, 200, 66, 0.4)',
+          color: 'var(--accent-yellow)', fontWeight: 700, fontSize: '0.9rem',
+          whiteSpace: 'nowrap',
+        }}>
+          <Coins size={16} /> {tokens}
+        </div>
+      </div>
+
+      {error && (
+        <div style={{
+          padding: '0.7rem 1rem', borderRadius: '10px',
+          background: 'rgba(224,85,85,0.1)', border: '1px solid rgba(224,85,85,0.3)',
+          color: 'var(--accent-red)', fontSize: '0.85rem',
+        }}>{error}</div>
+      )}
+
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+        gap: '1rem',
+      }}>
+        {FRAMES.map((frame) => {
+          const owned = frame.id === 'none' || ownedFrames.includes(frame.id);
+          const equipped = (selectedFrameId ?? 'none') === frame.id;
+          const canAfford = tokens >= frame.price;
+          const busy = busyId === frame.id;
+
+          return (
+            <div
+              key={frame.id}
+              style={{
+                padding: '1rem', borderRadius: '14px',
+                background: equipped ? 'rgba(245, 200, 66, 0.08)' : 'rgba(255,255,255,0.03)',
+                border: equipped ? '1px solid rgba(245, 200, 66, 0.5)' : '1px solid rgba(232,245,232,0.08)',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.6rem',
+                transition: 'background 0.15s, border-color 0.15s',
+              }}
+            >
+              <AvatarFrame size={72} src={avatarUrl} frameId={frame.id} alt={frame.name} />
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ color: 'var(--text-chalk)', fontWeight: 600, fontSize: '0.88rem' }}>{frame.name}</div>
+                {!owned && (
+                  <div style={{ color: 'var(--accent-yellow)', fontSize: '0.78rem', marginTop: '2px', display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                    <Coins size={11} /> {frame.price}
+                  </div>
+                )}
+              </div>
+
+              {equipped ? (
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                  padding: '0.4rem 0.7rem', borderRadius: '8px',
+                  background: 'rgba(245, 200, 66, 0.18)', color: 'var(--accent-yellow)',
+                  fontSize: '0.8rem', fontWeight: 600,
+                }}>
+                  <Check size={13} /> Equipped
+                </div>
+              ) : owned ? (
+                <button
+                  onClick={() => handleEquip(frame.id)}
+                  disabled={busy}
+                  style={{
+                    padding: '0.45rem 0.9rem', borderRadius: '8px',
+                    background: 'rgba(255,255,255,0.06)', color: 'var(--text-chalk)',
+                    border: '1px solid rgba(232,245,232,0.15)',
+                    fontSize: '0.82rem', fontWeight: 600,
+                    cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.5 : 1,
+                  }}
+                >
+                  {busy ? 'Equipping…' : 'Equip'}
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleBuy(frame.id)}
+                  disabled={busy || !canAfford}
+                  style={{
+                    padding: '0.45rem 0.9rem', borderRadius: '8px',
+                    background: canAfford ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.04)',
+                    color: canAfford ? '#1e2e1e' : 'var(--text-dim)',
+                    fontSize: '0.82rem', fontWeight: 700,
+                    cursor: (busy || !canAfford) ? 'not-allowed' : 'pointer',
+                    opacity: busy ? 0.6 : 1,
+                  }}
+                >
+                  {busy ? 'Buying…' : canAfford ? 'Buy' : 'Locked'}
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -12,30 +12,26 @@ export default function Results() {
   const navigate = useNavigate();
   const [playerName] = useState(localStorage.getItem('playerName') || `Player ${Math.floor(Math.random() * 1000)}`);
   const { socket, roomState, isConnected } = useSocket(roomId, playerName);
-  const { awardCoins } = useUserStore();
-  const awardedRef = useRef(false);
+  const { refreshProfile, isGuest } = useUserStore();
+  const refreshedRef = useRef(false);
   const [coinsEarned, setCoinsEarned] = useState(0);
 
   useEffect(() => {
-    if (!roomState || !socket || awardedRef.current) return;
-
-    // Guard against awarding twice (e.g. re-render or page refresh within same session)
-    const awardKey = `awarded_${roomId}`;
-    if (localStorage.getItem(awardKey)) return;
+    if (!roomState || !socket || refreshedRef.current) return;
 
     const me = roomState.players.find(p => p.id === socket.id);
     if (!me) return;
 
+    refreshedRef.current = true;
     const earned = Math.round((me.totalPoints || 0) * COINS_PER_POINT);
-    if (earned > 0) {
-      awardCoins(earned);
-      localStorage.setItem(awardKey, '1');
-      awardedRef.current = true;
-      setCoinsEarned(earned);
-    } else {
-      awardedRef.current = true;
+    setCoinsEarned(earned);
+
+    // The server has already awarded these coins to authenticated players via
+    // the award_coins RPC at game end — we just refetch to update the HUD.
+    if (!isGuest && earned > 0) {
+      refreshProfile().catch(err => console.error('Failed to refresh profile after game:', err));
     }
-  }, [roomState, socket, roomId, awardCoins]);
+  }, [roomState, socket, refreshProfile, isGuest]);
 
   if (!isConnected || !roomState) {
     return <div className="loading-container" style={{ color: 'var(--text-dim)', padding: '2rem', textAlign: 'center' }}>Loading results...</div>;
