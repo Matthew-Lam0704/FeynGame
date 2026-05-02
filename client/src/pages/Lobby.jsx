@@ -11,7 +11,20 @@ export default function Lobby() {
   
   const { roomState, isConnected, socketId, toggleReady, startGame, socket } = useSocket(roomId, playerName, navigate);
   const [isCopied, setIsCopied] = useState(false);
+  const [isCopiedUrl, setIsCopiedUrl] = useState(false);
   const [subjects, setSubjects] = useState({});
+
+  const copyRoomCode = () => {
+    navigator.clipboard.writeText(roomId);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const copyRoomUrl = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setIsCopiedUrl(true);
+    setTimeout(() => setIsCopiedUrl(false), 2000);
+  };
 
   useEffect(() => {
     const raw = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';

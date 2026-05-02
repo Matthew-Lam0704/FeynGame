@@ -201,11 +201,13 @@ app.post('/api/purchase-frame', async (req, res) => {
   if (error) {
     // RPC raises with a human-readable message on insufficient coins / already owned.
     const msg = error.message || '';
-    if (/insufficient coins/i.test(msg)) return res.status(400).json({ error: 'Insufficient coins' });
+    console.error('purchase_frame rpc error:', error);
+    
+    if (/insufficient coins/i.test(msg)) return res.status(400).json({ error: 'Insufficient tokens' });
     if (/already owned/i.test(msg))      return res.status(400).json({ error: 'Frame already owned' });
     if (/profile not found/i.test(msg))  return res.status(404).json({ error: 'Profile not found' });
-    console.error('purchase_frame rpc error:', error);
-    return res.status(500).json({ error: 'Purchase failed' });
+    
+    return res.status(400).json({ error: msg || 'Purchase failed' });
   }
 
   // Postgres `returns table` comes back as an array; we want the single row.
