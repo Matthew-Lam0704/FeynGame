@@ -77,18 +77,6 @@ export default function Lobby() {
   const me = players.find(p => p.id === socketId);
   const allReady = players.length >= 2 && players.every(p => p.isReady);
 
-  const copyRoomCode = () => {
-    navigator.clipboard.writeText(roomId);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const copyRoomUrl = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setIsCopiedUrl(true);
-    setTimeout(() => setIsCopiedUrl(false), 2000);
-  };
-
   return (
     <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh', background: 'radial-gradient(circle at top, #243824 0%, #1e2e1e 100%)' }}>
       
