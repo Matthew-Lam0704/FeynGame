@@ -149,6 +149,7 @@ export const useUserStore = create((set, get) => ({
     }, 5000);
 
     const hydrate = async (user) => {
+      set({ isLoading: true });
       bootstrapAvatar(user).catch(err => console.error('Non-fatal avatar bootstrap error:', err));
       localStorage.setItem('playerName', derivePlayerName(user));
       const profileFields = await fetchProfile(user);
