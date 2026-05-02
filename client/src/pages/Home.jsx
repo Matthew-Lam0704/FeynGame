@@ -37,6 +37,13 @@ export default function Home() {
     }
   };
 
+  const refreshRooms = () => {
+    fetch(`${SERVER_URL}/rooms`)
+      .then(r => r.json())
+      .then(setPublicRooms)
+      .catch(() => {});
+  };
+
   return (
     <div className="home-container" style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', position: 'relative' }}>
       
@@ -104,7 +111,6 @@ export default function Home() {
           </form>
         </div>
       </main>
-      </main>
 
       {/* Public Rooms Section */}
       <section style={{ marginTop: '4rem', width: '100%', maxWidth: '800px' }} className="animate-fade-in">
@@ -113,23 +119,15 @@ export default function Home() {
             <Users size={24} color="var(--text-chalk)" />
             <h2 style={{ fontSize: '1.5rem' }}>Live Public Rooms</h2>
             <button 
-              onClick={() => {
-                const fetchRooms = () => {
-                  fetch(`${SERVER_URL}/rooms`)
-                    .then(r => r.json())
-                    .then(setPublicRooms)
-                    .catch(() => {});
-                };
-                fetchRooms();
-              }}
+              onClick={refreshRooms}
               style={{
                 background: 'transparent', border: 'none', color: 'var(--text-dim)', 
                 cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px',
                 fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px',
                 transition: 'all 0.2s'
               }}
-              onMouseEnter={e => e.currentTarget.style.color = 'var(--text-chalk)'}
-              onMouseLeave={e => e.currentTarget.style.color = 'var(--text-dim)'}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-chalk)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--text-dim)'; }}
             >
               <RotateCcw size={14} /> Refresh
             </button>
