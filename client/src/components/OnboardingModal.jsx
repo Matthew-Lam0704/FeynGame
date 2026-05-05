@@ -4,26 +4,26 @@ import { ChevronRight, ChevronLeft, Play, Info, Mic, Pencil } from 'lucide-react
 
 const SLIDES = [
   {
-    title: "Welcome to Feynman Club",
-    content: "The ultimate game of understanding. Based on the Feynman Technique: if you can't explain it simply, you don't understand it well enough.",
+    title: "Welcome to Chalkmate",
+    content: "The study tool built around the Feynman Technique: if you can't explain it simply, you don't understand it well enough.",
     icon: <Info size={48} color="var(--accent-yellow)" />,
     color: "var(--accent-yellow)"
   },
   {
-    title: "Explain It Simply",
-    content: "One player is the Explainer. Use your mic and the shared chalkboard to teach a complex topic to the class in 90 seconds.",
+    title: "Teach to Learn",
+    content: "One player explains; the rest learn and rate. The shared whiteboard and voice channel turn any topic into a 90-second mini-lesson.",
     icon: <Mic size={48} color="var(--accent-blue)" />,
     color: "var(--accent-blue)"
   },
   {
-    title: "Visual Learning",
-    content: "Use professional drawing tools, shapes, and text to make your explanation crystal clear. Your every stroke is synced live!",
+    title: "Draw it Out",
+    content: "Pen, eraser, shapes, text and a real color wheel. Your strokes sync live so the whole class sees what you draw.",
     icon: <Pencil size={48} color="var(--accent-red)" />,
     color: "var(--accent-red)"
   },
   {
-    title: "Earn Scholar Tokens",
-    content: "Score high to earn tokens! Use them to unlock exclusive avatar frames and show off your teaching prowess.",
+    title: "Earn & Unlock",
+    content: "Strong explanations earn coins. Spend them on avatar frames and (soon) exclusive content packs.",
     icon: <Play size={48} color="var(--text-chalk)" />,
     color: "var(--text-chalk)"
   }
@@ -36,6 +36,8 @@ export default function OnboardingModal({ onComplete }) {
     if (currentSlide < SLIDES.length - 1) {
       setCurrentSlide(s => s + 1);
     } else {
+      localStorage.setItem('chalkmate_onboarded', 'true');
+      // Keep the legacy key around so users who already onboarded under the old name don't see this again
       localStorage.setItem('feyn_onboarded', 'true');
       onComplete();
     }

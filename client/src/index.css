@@ -1,31 +1,76 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Mono:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Space+Mono:wght@400;700&family=DM+Serif+Display:ital@0;1&display=swap');
 
 :root {
-  /* Colors */
+  /* Colors — chalkboard palette */
   --bg-dark: #1e2e1e;
   --bg-medium: #243824;
   --bg-light: #2c442c;
-  
+
   --text-chalk: #e8f5e8;
   --text-dim: #9ab39a;
+  --text-faint: rgba(232, 245, 232, 0.5);
 
   --accent-yellow: #f5c842;
   --accent-red: #e05555;
   --accent-blue: #5599e0;
+  --accent-green: #4cdb8a;
   --accent-gold: #ffb703;
 
   /* Typography */
+  --font-chalk: 'Caveat', cursive;
   --font-serif: 'DM Serif Display', serif;
   --font-sans: 'DM Sans', sans-serif;
   --font-mono: 'Space Mono', monospace;
 
+  /* Type scale (with paired line-height) */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: 3rem;
+  --text-5xl: 4rem;
+
+  /* 4px spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
+  --radius-full: 50%;
+
   /* Borders */
   --border-chalk: 2px solid rgba(232, 245, 232, 0.4);
-  
+  --border-faint: 1px solid rgba(232, 245, 232, 0.1);
+
   /* Shadows */
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 50px rgba(0, 0, 0, 0.5);
+  --shadow-glow-yellow: 0 0 20px rgba(245, 200, 66, 0.4);
+  --shadow-glow-blue: 0 0 20px rgba(85, 153, 224, 0.3);
+
+  /* Motion */
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 150ms;
+  --duration-med: 250ms;
+  --duration-slow: 400ms;
 }
 
 * {
@@ -37,9 +82,9 @@
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-dark);
-  background-image: 
+  background-image:
     radial-gradient(circle at 50% 50%, rgba(36, 56, 36, 0.5) 0%, transparent 100%),
-    url('https://www.transparenttextures.com/patterns/dark-matter.png'); /* Subtle chalkboard grit */
+    url('https://www.transparenttextures.com/patterns/dark-matter.png');
   color: var(--text-chalk);
   min-height: 100vh;
   overflow-x: hidden;
@@ -47,10 +92,15 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-serif);
+  font-family: var(--font-chalk);
   font-weight: 700;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.005em;
+  line-height: 1.1;
 }
+
+h1 { font-size: var(--text-5xl); }
+h2 { font-size: var(--text-3xl); }
+h3 { font-size: var(--text-xl); }
 
 button {
   cursor: pointer;
@@ -58,7 +108,7 @@ button {
   border: none;
   background: none;
   color: inherit;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all var(--duration-fast) var(--ease-soft);
 }
 
 a {
@@ -66,25 +116,39 @@ a {
   text-decoration: none;
 }
 
-/* Base button style */
+/* Buttons */
 .btn {
-  padding: 12px 28px;
-  border-radius: 12px;
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-md);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--text-md);
   border: var(--border-chalk);
   background-color: transparent;
   color: var(--text-chalk);
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
+  transition: transform var(--duration-fast) var(--ease-soft),
+              background-color var(--duration-fast) var(--ease-soft),
+              border-color var(--duration-fast) var(--ease-soft),
+              box-shadow var(--duration-fast) var(--ease-soft);
 }
 
 .btn:hover {
   background-color: rgba(232, 245, 232, 0.08);
   transform: translateY(-2px);
-  border-color: rgba(232, 245, 232, 0.8);
+  border-color: rgba(232, 245, 232, 0.7);
+}
+
+.btn:active {
+  transform: translateY(1px) scale(0.98);
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-primary {
@@ -98,8 +162,27 @@ a {
   box-shadow: 0 0 20px rgba(232, 245, 232, 0.3);
 }
 
-.btn:active {
-  transform: translateY(0);
+.btn-accent {
+  background-color: var(--accent-yellow);
+  color: var(--bg-dark);
+  border: none;
+  font-weight: 700;
+}
+
+.btn-accent:hover {
+  background-color: #ffd862;
+  box-shadow: var(--shadow-glow-yellow);
+}
+
+.btn-ghost {
+  background-color: transparent;
+  border: var(--border-faint);
+  color: var(--text-dim);
+}
+
+.btn-ghost:hover {
+  color: var(--text-chalk);
+  border-color: rgba(232, 245, 232, 0.4);
 }
 
 /* Animations */
@@ -137,23 +220,29 @@ a {
   to { transform: rotate(360deg); }
 }
 
+@keyframes chalkDust {
+  from { opacity: 0; transform: translateY(0); }
+  50% { opacity: 1; }
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
 .animate-fade-in {
-  animation: fadeIn 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation: fadeIn 0.6s var(--ease-soft) forwards;
 }
 
 .animate-slide-up {
-  animation: slideUp 0.7s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+  animation: slideUp 0.7s var(--ease-soft) forwards;
 }
 
 .animate-topic-drop {
-  animation: topicDrop 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  animation: topicDrop 0.8s var(--ease-spring) forwards;
 }
 
 .glass-panel {
   background: rgba(36, 56, 36, 0.4);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(232, 245, 232, 0.1);
-  border-radius: 16px;
+  border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
 }
 
@@ -196,11 +285,7 @@ a {
   border-radius: 4px;
 }
 
-.btn:active {
-  transform: translateY(1px) scale(0.98);
-}
-
-input:focus, select:focus {
+input:focus, select:focus, textarea:focus {
   border-color: var(--accent-yellow) !important;
   box-shadow: 0 0 15px rgba(245, 200, 66, 0.15);
   background: rgba(255, 255, 255, 0.05) !important;
@@ -225,24 +310,42 @@ select option {
   color: var(--text-chalk);
 }
 
-/* Page Transitions */
-.page-enter {
-  opacity: 0;
-  transform: translateX(20px);
+/* Native range slider styling for the chalk theme */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  outline: none;
 }
-.page-enter-active {
-  opacity: 1;
-  transform: translateX(0);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-chalk);
+  border: 2px solid var(--accent-yellow);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+  transition: transform var(--duration-fast) var(--ease-soft);
 }
-.page-exit {
-  opacity: 1;
-  transform: translateX(0);
+
+input[type='range']::-webkit-slider-thumb:active {
+  transform: scale(1.15);
+  cursor: grabbing;
 }
-.page-exit-active {
-  opacity: 0;
-  transform: translateX(-20px);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+
+input[type='range']::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--text-chalk);
+  border: 2px solid var(--accent-yellow);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: grab;
 }
 
 @keyframes shake {
@@ -255,15 +358,30 @@ select option {
   animation: shake 0.2s ease-in-out 0s 2;
 }
 
+/* Chalk-style underline used for the brand wordmark */
+.chalk-underline {
+  position: relative;
+  display: inline-block;
+}
+.chalk-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 8%;
+  right: 8%;
+  height: 3px;
+  background: rgba(232, 245, 232, 0.3);
+  border-radius: 50% 50% 50% 50% / 100% 100% 0 0;
+}
 
 .chalkboard-frame {
   position: relative;
   padding: 16px;
-  background: #3d2b1f; /* Dark wood base */
+  background: #3d2b1f;
   background-image: linear-gradient(to right, rgba(0,0,0,0.2), transparent 5%, transparent 95%, rgba(0,0,0,0.2)),
                     linear-gradient(to bottom, rgba(0,0,0,0.2), transparent 5%, transparent 95%, rgba(0,0,0,0.2));
   border-radius: 8px;
-  box-shadow: 
+  box-shadow:
     inset 0 0 40px rgba(0,0,0,0.5),
     0 10px 30px rgba(0,0,0,0.4),
     0 4px 0 #2a1d15;

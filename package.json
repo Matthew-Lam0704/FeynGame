@@ -1,7 +1,7 @@
 {
-  "name": "feynman-club",
-  "version": "1.0.0",
-  "description": "Feynman Club — explain it simply. win.",
+  "name": "chalkmate",
+  "version": "1.1.0",
+  "description": "Chalkmate — learn it by teaching it.",
   "scripts": {
     "start": "concurrently \"npm run server\" \"npm run client\"",
     "server": "cd server && node index.js",

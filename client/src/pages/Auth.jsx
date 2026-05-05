@@ -145,8 +145,8 @@ export default function Auth() {
         animate={{ opacity: 1, y: 0 }}
         style={{ textAlign: 'center', marginBottom: '3rem', zIndex: 1 }}
       >
-        <h1 style={{ fontSize: '4rem', color: 'var(--text-chalk)', marginBottom: '0.5rem' }}>Feynman Club</h1>
-        <p style={{ fontSize: '1.2rem', color: 'var(--text-dim)', fontStyle: 'italic' }}>explain it simply. win.</p>
+        <h1 className="chalk-underline" style={{ fontSize: 'var(--text-5xl)', color: 'var(--text-chalk)', marginBottom: '0.5rem', fontFamily: 'var(--font-chalk)' }}>Chalkmate</h1>
+        <p style={{ fontSize: 'var(--text-lg)', color: 'var(--text-dim)', fontStyle: 'italic', marginTop: 'var(--space-3)' }}>Learn it by teaching it.</p>
       </motion.div>
 
       <motion.div
