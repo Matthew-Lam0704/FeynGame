@@ -1,10 +1,10 @@
 import { useRef } from 'react';
 
+// Only sounds that *enhance* the experience. Tick countdowns and bells were
+// removed — they nagged rather than informed.
 const SOUNDS = {
   CHALK: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
-  BELL: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
-  TICK: 'https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3',
-  WHOOSH: 'https://assets.mixkit.co/active_storage/sfx/2569/2569-preview.mp3'
+  WHOOSH: 'https://assets.mixkit.co/active_storage/sfx/2569/2569-preview.mp3',
 };
 
 export const useSounds = () => {
@@ -12,12 +12,12 @@ export const useSounds = () => {
 
   const play = (soundName) => {
     if (!SOUNDS[soundName]) return;
-    
     if (!audioRefs.current[soundName]) {
       audioRefs.current[soundName] = new Audio(SOUNDS[soundName]);
     }
-    
     const audio = audioRefs.current[soundName];
+    const v = parseInt(localStorage.getItem('masterVolume') || '80', 10);
+    audio.volume = Math.min(Math.max(v / 100, 0), 1);
     audio.currentTime = 0;
     audio.play().catch(() => {});
   };

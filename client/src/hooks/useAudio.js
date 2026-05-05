@@ -5,17 +5,51 @@ const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 const SERVER_URL = rawServerUrl.startsWith('http') ? rawServerUrl : `https://${rawServerUrl}`;
 const LIVEKIT_URL = import.meta.env.VITE_LIVEKIT_URL || 'ws://localhost:7880';
 
+// Aggressively shut down every microphone-related resource we may have opened.
+// The browser will continue to show a mic-in-use indicator until *all* tracks
+// associated with the granted permission are stopped — including the initial
+// permission probe stream and any LiveKit publication's underlying media track.
+const releaseAllAudio = (room, initialStream) => {
+  try {
+    if (initialStream) {
+      initialStream.getTracks().forEach((t) => { try { t.stop(); } catch (_) {} });
+    }
+  } catch (_) {}
+
+  try {
+    if (room) {
+      // Walk every publication and stop the underlying MediaStreamTrack — this
+      // is what releases the OS-level mic handle. `track.stop()` on the LiveKit
+      // wrapper sometimes misses the inner media track on disconnect.
+      room.localParticipant?.trackPublications?.forEach((pub) => {
+        try { pub.track?.mediaStreamTrack?.stop(); } catch (_) {}
+        try { pub.track?.stop(); } catch (_) {}
+      });
+      try { room.localParticipant?.unpublishAllTracks?.(); } catch (_) {}
+      try { room.disconnect(true); } catch (_) {}
+    }
+  } catch (_) {}
+
+  // Detach any remote audio elements we appended to the body.
+  document.querySelectorAll('audio[data-livekit]').forEach((el) => {
+    try { el.srcObject = null; } catch (_) {}
+    el.remove();
+  });
+};
+
 export const useAudio = (roomId, playerName, isExplainer, micActive) => {
   const [room, setRoom] = useState(null);
   const [participants, setParticipants] = useState([]);
   const [error, setError] = useState(null);
   const localTrackRef = useRef(null);
   const initialStreamRef = useRef(null);
+  const roomRef = useRef(null);
 
   useEffect(() => {
     if (!roomId || !playerName) return;
+    let cancelled = false;
 
-    const connectToRoom = async () => {
+    const connect = async () => {
       try {
         const resp = await fetch(
           `${SERVER_URL}/token?room=${encodeURIComponent(roomId)}&username=${encodeURIComponent(playerName)}`
@@ -26,9 +60,17 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
         }
         const { token } = await resp.json();
 
+        if (cancelled) return;
+
         const newRoom = new Room();
         await newRoom.connect(LIVEKIT_URL, token);
 
+        if (cancelled) {
+          releaseAllAudio(newRoom, initialStreamRef.current);
+          return;
+        }
+
+        roomRef.current = newRoom;
         setRoom(newRoom);
 
         const updateParticipants = () =>
@@ -36,88 +78,103 @@ export const useAudio = (roomId, playerName, isExplainer, micActive) => {
 
         newRoom.on(RoomEvent.ParticipantConnected, updateParticipants);
         newRoom.on(RoomEvent.ParticipantDisconnected, updateParticipants);
-        
-        // Handle incoming audio from remote participants
+
         newRoom.on(RoomEvent.TrackSubscribed, (track) => {
           if (track.kind === 'audio') {
             const audioEl = track.attach();
             audioEl.setAttribute('data-livekit', 'true');
+            // Apply the user's master volume preference if set
+            const v = parseInt(localStorage.getItem('masterVolume') || '80', 10);
+            audioEl.volume = Math.min(Math.max(v / 100, 0), 1);
             document.body.appendChild(audioEl);
           }
         });
-        
+
         newRoom.on(RoomEvent.TrackUnsubscribed, (track) => {
-          track.detach().forEach(el => el.remove());
+          track.detach().forEach((el) => el.remove());
         });
 
-        // Prompt the browser mic dialog at game load so it doesn't interrupt gameplay
-        navigator.mediaDevices.getUserMedia({ audio: true })
-          .then(stream => {
+        // Probe permissions early so the dialog isn't disruptive mid-game.
+        navigator.mediaDevices
+          .getUserMedia({ audio: true })
+          .then((stream) => {
+            if (cancelled) {
+              stream.getTracks().forEach((t) => t.stop());
+              return;
+            }
             initialStreamRef.current = stream;
-            stream.getTracks().forEach(t => t.stop());
+            // Stop tracks immediately — LiveKit will request its own when we
+            // actually need to publish. Keeping a reference lets us verify in
+            // dev that nothing leaks.
+            stream.getTracks().forEach((t) => t.stop());
           })
           .catch(() => {});
 
         updateParticipants();
-
-        return newRoom;
       } catch (e) {
-        setError(e.message);
+        if (!cancelled) setError(e.message);
       }
     };
 
-    const roomPromise = connectToRoom();
+    connect();
+
     return () => {
-      roomPromise.then(r => {
-        if (!r) return;
-        
-        // Stop initial permission stream if still active
-        if (initialStreamRef.current) {
-          initialStreamRef.current.getTracks().forEach(t => t.stop());
-          initialStreamRef.current = null;
-        }
+      cancelled = true;
+      const r = roomRef.current;
+      const local = localTrackRef.current;
+      const initial = initialStreamRef.current;
 
-        if (localTrackRef.current) {
-          r.localParticipant.unpublishTrack(localTrackRef.current);
-          localTrackRef.current.stop();
-          localTrackRef.current = null;
-        }
+      if (local) {
+        try { r?.localParticipant?.unpublishTrack(local); } catch (_) {}
+        try { local.mediaStreamTrack?.stop(); } catch (_) {}
+        try { local.stop(); } catch (_) {}
+        localTrackRef.current = null;
+      }
 
-        // Force stop all local tracks
-        r.localParticipant.trackPublications.forEach(pub => {
-          if (pub.track) pub.track.stop();
-        });
-        r.localParticipant.unpublishAllTracks();
-
-        document.querySelectorAll('audio[data-livekit]').forEach(el => el.remove());
-        r.disconnect();
-      });
+      releaseAllAudio(r, initial);
+      roomRef.current = null;
+      initialStreamRef.current = null;
+      setRoom(null);
+      setParticipants([]);
     };
   }, [roomId, playerName]);
 
+  // Publish/unpublish the explainer mic.
   useEffect(() => {
     if (!room) return;
+    let cancelled = false;
 
-    const handleMic = async () => {
-      if (isExplainer && micActive) {
-        if (!localTrackRef.current) {
-          const track = await createLocalAudioTrack();
-          await room.localParticipant.publishTrack(track);
-          localTrackRef.current = track;
-        } else {
-          await localTrackRef.current.unmute();
-        }
-      } else {
-        if (localTrackRef.current) {
+    const handle = async () => {
+      try {
+        if (isExplainer && micActive) {
+          if (!localTrackRef.current) {
+            const deviceId = localStorage.getItem('audioInputDeviceId') || undefined;
+            const track = await createLocalAudioTrack(deviceId ? { deviceId } : {});
+            if (cancelled) {
+              try { track.mediaStreamTrack?.stop(); } catch (_) {}
+              try { track.stop(); } catch (_) {}
+              return;
+            }
+            await room.localParticipant.publishTrack(track);
+            localTrackRef.current = track;
+          } else {
+            await localTrackRef.current.unmute();
+          }
+        } else if (localTrackRef.current) {
           const track = localTrackRef.current;
-          await room.localParticipant.unpublishTrack(track);
-          track.stop();
           localTrackRef.current = null;
+          try { await room.localParticipant.unpublishTrack(track); } catch (_) {}
+          try { track.mediaStreamTrack?.stop(); } catch (_) {}
+          try { track.stop(); } catch (_) {}
         }
+      } catch (e) {
+        // Surface mic errors but don't crash the room.
+        console.error('[useAudio] mic toggle failed:', e);
       }
     };
 
-    handleMic();
+    handle();
+    return () => { cancelled = true; };
   }, [room, isExplainer, micActive]);
 
   return { room, participants, error };
