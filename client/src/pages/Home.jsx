@@ -59,7 +59,10 @@ export default function Home() {
         return;
       }
       const info = await resp.json();
-      if (!info.joinable) {
+      // Older server versions don't return a `joinable` field — only block if
+      // the field is explicitly false (so the new client stays compatible
+      // during a deploy gap where the server hasn't shipped yet).
+      if (info.joinable === false) {
         setJoinError('That room is full or no longer accepting joiners.');
         return;
       }
