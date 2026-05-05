@@ -43,13 +43,11 @@ export default function Game() {
     if (socket) {
       const onTimerSync = (time) => {
         setTimeRemaining(time);
-        if (time <= 10 && time > 0) play('TICK');
       };
       const onTransitionSync = (time) => setTransitionTime(time);
-      
+
       const onDoneStart = ({ duration }) => {
         setDoneCountdown(duration);
-        play('TICK');
       };
       const onDoneCancel = () => setDoneCountdown(null);
 
@@ -86,8 +84,6 @@ export default function Game() {
   useEffect(() => {
     if (roomState?.status === 'playing') {
       play('WHOOSH');
-    } else if (roomState?.status === 'between_rounds') {
-      play('BELL');
     } else if (roomState?.status === 'results') {
       navigate(`/results/${roomId}`);
     }
@@ -156,7 +152,7 @@ export default function Game() {
 
   const submitScore = (val) => {
     if (socket && roomId) {
-      socket.emit('submit_score', { roomId, score: val });
+      socket.emit('submit_score', { roomId, score: val, roundId: roomState?.roundId });
     }
   };
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Copy, CheckCircle, Circle, Play, User, Clock, RotateCcw, BookOpen, Globe, Lock, Settings, Share2 } from 'lucide-react';
+import { Copy, CheckCircle, Circle, Play, User, Clock, RotateCcw, BookOpen, Globe, Lock, Settings, Share2, ListPlus } from 'lucide-react';
 import { useSocket } from '../hooks/useSocket';
 import AvatarFrame from '../components/AvatarFrame';
 
@@ -13,6 +13,8 @@ export default function Lobby() {
   const [isCopied, setIsCopied] = useState(false);
   const [isCopiedUrl, setIsCopiedUrl] = useState(false);
   const [subjects, setSubjects] = useState({});
+  const [showCustomTopics, setShowCustomTopics] = useState(false);
+  const [customTopicsDraft, setCustomTopicsDraft] = useState('');
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(roomId);
@@ -45,19 +47,10 @@ export default function Lobby() {
   }, [roomId, navigate]);
 
   useEffect(() => {
-    const onJoinError = (err) => {
-      if (err.code === 'ROOM_NOT_FOUND') {
-        navigate('/', { state: { error: 'Room not found or session ended.' } });
-      }
-    };
-    socket.on('join_error', onJoinError);
-    return () => {
-      socket.off('join_error', onJoinError);
-    };
-  }, [socket, navigate]);
-
-  useEffect(() => {
-    if (roomState?.status === 'playing') {
+    // Move to /game as soon as the host starts a session — selecting_topic /
+    // playing / between_rounds all live on the Game page.
+    const status = roomState?.status;
+    if (status === 'playing' || status === 'selecting_topic' || status === 'between_rounds') {
       navigate(`/game/${roomId}`);
     }
   }, [roomState?.status, roomId, navigate]);
@@ -81,10 +74,10 @@ export default function Lobby() {
     <div style={{ padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '100vh', background: 'radial-gradient(circle at top, #243824 0%, #1e2e1e 100%)' }}>
       
       <header style={{ textAlign: 'center', marginBottom: '4rem', marginTop: '2rem' }}>
-        <h1 style={{ fontSize: '3.5rem', color: 'var(--text-chalk)', marginBottom: '0.5rem', fontFamily: 'var(--font-serif)' }}>
+        <h1 style={{ fontSize: 'var(--text-4xl)', color: 'var(--text-chalk)', marginBottom: '0.5rem', fontFamily: 'var(--font-chalk)' }}>
           Study Hall
         </h1>
-        <p style={{ color: 'var(--text-dim)', marginBottom: '1.5rem' }}>Invite your classmates to begin the session.</p>
+        <p style={{ color: 'var(--text-dim)', marginBottom: '1.5rem' }}>Invite your classmates and ready up to begin.</p>
         
         <div 
           onClick={copyRoomCode}
@@ -233,23 +226,23 @@ export default function Lobby() {
                 <Settings size={16} />
                 Host Settings
               </div>
-              
+
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem' }}>
                 <div className="input-group">
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Subject</label>
-                  <select 
-                    value={roomState.subject || ''} 
+                  <select
+                    value={roomState.subject || ''}
                     onChange={(e) => socket.emit('update_room_settings', { roomId, subject: e.target.value, subtopic: subjects[e.target.value]?.[0] || '' })}
                     style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '0.6rem', borderRadius: '8px', color: 'white' }}
                   >
                     {Object.keys(subjects).map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
-                
+
                 <div className="input-group">
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Subtopic</label>
-                  <select 
-                    value={roomState.subtopic || ''} 
+                  <select
+                    value={roomState.subtopic || ''}
                     onChange={(e) => socket.emit('update_room_settings', { roomId, subtopic: e.target.value })}
                     style={{ width: '100%', background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)', padding: '0.6rem', borderRadius: '8px', color: 'white' }}
                   >
@@ -261,10 +254,10 @@ export default function Lobby() {
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Turn Duration</label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     {[30, 60, 90, 120].map(d => (
-                      <button 
-                        key={d} 
+                      <button
+                        key={d}
                         onClick={() => socket.emit('update_room_settings', { roomId, roundDuration: d })}
-                        style={{ 
+                        style={{
                           flex: 1, padding: '0.4rem', borderRadius: '6px', fontSize: '0.8rem',
                           background: roomState.roundDuration === d ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.05)',
                           color: roomState.roundDuration === d ? 'black' : 'white',
@@ -278,19 +271,106 @@ export default function Lobby() {
                 </div>
 
                 <div className="input-group">
+                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Difficulty (coin multiplier)</label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {[
+                      { v: 'easy', label: 'Easy', mult: '1×', color: '#5599e0' },
+                      { v: 'normal', label: 'Normal', mult: '1.5×', color: '#f5c842' },
+                      { v: 'hard', label: 'Hard', mult: '2×', color: '#e05555' },
+                    ].map(opt => (
+                      <button
+                        key={opt.v}
+                        onClick={() => socket.emit('update_room_settings', { roomId, difficulty: opt.v })}
+                        style={{
+                          flex: 1, padding: '0.4rem', borderRadius: '6px', fontSize: '0.8rem',
+                          background: (roomState.difficulty || 'normal') === opt.v ? opt.color : 'rgba(255,255,255,0.05)',
+                          color: (roomState.difficulty || 'normal') === opt.v ? '#1e2e1e' : 'white',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          fontWeight: 600,
+                        }}
+                      >
+                        {opt.label} <span style={{ opacity: 0.7, marginLeft: 4 }}>{opt.mult}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="input-group">
                   <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>Visibility</label>
-                  <button 
+                  <button
                     onClick={() => socket.emit('update_room_visibility', { roomId, isPublic: !roomState.isPublic })}
-                    style={{ 
+                    style={{
                       width: '100%', padding: '0.6rem', borderRadius: '8px', fontSize: '0.9rem', fontWeight: 'bold',
                       background: roomState.isPublic ? 'rgba(85, 153, 224, 0.15)' : 'rgba(255,255,255,0.05)',
                       color: roomState.isPublic ? 'var(--accent-blue)' : 'var(--text-dim)',
-                      border: roomState.isPublic ? '1px solid var(--accent-blue)' : '1px solid rgba(255,255,255,0.1)'
+                      border: roomState.isPublic ? '1px solid var(--accent-blue)' : '1px solid rgba(255,255,255,0.1)',
                     }}
                   >
                     Set to {roomState.isPublic ? 'Private' : 'Public'}
                   </button>
                 </div>
+              </div>
+
+              {/* Custom topics editor */}
+              <div style={{ marginTop: '1.5rem' }}>
+                <button
+                  onClick={() => {
+                    setShowCustomTopics(s => !s);
+                    setCustomTopicsDraft((roomState.customWords || []).join(', '));
+                  }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.5rem',
+                    fontSize: '0.85rem', color: 'var(--text-dim)',
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  <ListPlus size={14} />
+                  {(roomState.customWords && roomState.customWords.length > 0)
+                    ? `${roomState.customWords.length} custom topics`
+                    : 'Add custom topics'}
+                  <span style={{ marginLeft: 'auto', opacity: 0.6 }}>{showCustomTopics ? '▲' : '▼'}</span>
+                </button>
+                {showCustomTopics && (
+                  <div style={{ marginTop: '0.75rem' }}>
+                    <textarea
+                      value={customTopicsDraft}
+                      onChange={(e) => setCustomTopicsDraft(e.target.value)}
+                      placeholder="Comma-separated topics, e.g. Photosynthesis, DNA Replication, Mitochondria"
+                      style={{
+                        width: '100%', padding: '0.7rem', borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        background: 'rgba(0,0,0,0.2)',
+                        color: 'var(--text-chalk)', fontSize: '0.9rem',
+                        minHeight: '70px', resize: 'vertical', fontFamily: 'inherit',
+                      }}
+                    />
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <button
+                        onClick={() => {
+                          const list = customTopicsDraft.split(',').map(s => s.trim()).filter(Boolean);
+                          socket.emit('update_room_settings', { roomId, customWords: list });
+                        }}
+                        className="btn btn-accent"
+                        style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                      >
+                        Save Topics
+                      </button>
+                      <button
+                        onClick={() => {
+                          socket.emit('update_room_settings', { roomId, customWords: [] });
+                          setCustomTopicsDraft('');
+                        }}
+                        className="btn btn-ghost"
+                        style={{ padding: '0.4rem 1rem', fontSize: '0.85rem' }}
+                      >
+                        Clear
+                      </button>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginLeft: 'auto', alignSelf: 'center' }}>
+                        Custom topics override the subject bank.
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

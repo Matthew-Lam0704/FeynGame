@@ -6,7 +6,6 @@ import { useUserStore } from '../store/useUserStore';
 import { supabase } from '../lib/supabase';
 import { FRAMES } from '../lib/frames';
 import AvatarFrame from './AvatarFrame';
-import VolumeSlider from './VolumeSlider';
 
 const rawServerUrl = import.meta.env.VITE_SERVER_URL || 'http://localhost:3001';
 // Guard against missing protocol (e.g. Vercel dashboard env var without https://)
@@ -317,9 +316,23 @@ function AudioSection({ inputDevices, outputDevices, selectedInput, selectedOutp
               <span>Master Volume</span>
               <span style={{ color: 'var(--accent-yellow)', fontFamily: 'var(--font-mono)', fontSize: '0.9rem' }}>{volume}%</span>
             </label>
-            <div style={{ position: 'relative' }}>
-              <VolumeSlider value={volume} onChange={onVolumeChange} />
-            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={volume}
+              onChange={(e) => onVolumeChange(parseInt(e.target.value, 10))}
+              aria-label="Master volume"
+              style={{
+                width: '100%',
+                background: `linear-gradient(to right, var(--accent-yellow) 0%, var(--accent-yellow) ${volume}%, rgba(255,255,255,0.1) ${volume}%, rgba(255,255,255,0.1) 100%)`,
+                height: '6px',
+                borderRadius: '3px',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+            />
           </div>
         </>
       )}

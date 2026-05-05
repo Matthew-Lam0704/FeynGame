@@ -131,6 +131,8 @@ export const useUserStore = create((set, get) => ({
       email: null,
     };
     localStorage.setItem('playerName', username);
+    // Persist guest identity so a page refresh doesn't bounce them to /auth.
+    localStorage.setItem('chalkmate_guest', JSON.stringify({ guestUser, avatarUrl }));
     set({
       user: guestUser,
       profile: { tokens: 0, avatarUrl, selectedFrameId: null, ownedFrames: [] },
@@ -140,6 +142,24 @@ export const useUserStore = create((set, get) => ({
   },
 
   initAuth: () => {
+    // Restore a previously-saved guest immediately so a page refresh doesn't
+    // bounce them to /auth. Real auth resolution still happens below and will
+    // overwrite this if a Supabase session is present.
+    try {
+      const saved = localStorage.getItem('chalkmate_guest');
+      if (saved) {
+        const { guestUser, avatarUrl } = JSON.parse(saved);
+        if (guestUser?.id?.startsWith('guest_')) {
+          set({
+            user: guestUser,
+            profile: { tokens: 0, avatarUrl, selectedFrameId: null, ownedFrames: [] },
+            isGuest: true,
+            isLoading: false,
+          });
+        }
+      }
+    } catch (_) { /* corrupt state — ignore and let auth resolve normally */ }
+
     // Fallback: don't stay in loading state forever
     const timeout = setTimeout(() => {
       if (get().isLoading) {
@@ -200,25 +220,26 @@ export const useUserStore = create((set, get) => ({
       if (user) {
         console.log('Initial session retrieved:', user.id);
         hydrate(user, 'INITIAL_SESSION');
-      } else {
+      } else if (!get().isGuest) {
         console.log('No initial session found');
         set({ user: null, profile: null, isLoading: false });
       }
     }).catch((err) => {
       console.error('getSession error:', err);
-      set({ user: null, profile: null, isLoading: false });
+      if (!get().isGuest) set({ user: null, profile: null, isLoading: false });
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user ?? null;
       console.log('Auth state changed:', _event, user?.id);
-      
+
       if (user) {
         // Fire and forget, don't await here as it might block Supabase internal emitter
         hydrate(user, _event);
       } else if (_event === 'SIGNED_OUT') {
         set({ user: null, profile: null, isGuest: false, isLoading: false });
-      } else {
+      } else if (!get().isGuest) {
+        // Don't wipe an active guest session on a no-user auth event.
         set({ user: null, profile: null, isLoading: false });
       }
     });
@@ -243,6 +264,7 @@ export const useUserStore = create((set, get) => ({
     const { isGuest } = get();
     if (!isGuest) await supabase.auth.signOut();
     localStorage.removeItem('playerName');
+    localStorage.removeItem('chalkmate_guest');
     set({ user: null, profile: null, isGuest: false });
   },
 }));
