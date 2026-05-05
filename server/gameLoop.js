@@ -1,6 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { getRandomWord } = require('./topics');
-const { getRoom } = require('./rooms');
+const { getRoom, resetBoardState } = require('./rooms');
 
 const COINS_PER_POINT = 5;
 
@@ -17,8 +17,7 @@ const getAdmin = () => {
 };
 
 // Awards coins to every authenticated player in the room. Idempotent at the
-// room level via room.coinsAwarded — startNextRound only transitions to
-// 'results' once, but this guards against any future re-entry.
+// room level via room.coinsAwarded.
 const awardCoinsForRoom = async (room) => {
   if (room.coinsAwarded) return;
   room.coinsAwarded = true;
@@ -39,8 +38,6 @@ const awardCoinsForRoom = async (room) => {
     });
     if (error) {
       console.error(`[AWARD] Failed for user ${player.userId}:`, error.message);
-    } else {
-      console.log(`[AWARD] +${amount} coins (${multiplier}x) to user ${player.userId} in room ${room.id}`);
     }
   }));
 };
@@ -50,10 +47,8 @@ const startNextRound = (io, roomId) => {
   if (!room) return;
 
   room.currentExplainerIndex++;
-  const explainerIndex = room.currentExplainerIndex % room.players.length;
+  const explainerIndex = room.currentExplainerIndex % Math.max(1, room.players.length);
   const explainer = room.players[explainerIndex];
-
-  console.log(`[ROUND START] Room: ${roomId}, Round: ${room.currentExplainerIndex + 1}/${room.totalRounds}, Explainer: ${explainer?.name}, Duration: ${room.roundDuration}`);
 
   if (room.currentExplainerIndex >= (room.totalRounds || room.players.length)) {
     room.status = 'results';
@@ -64,22 +59,24 @@ const startNextRound = (io, roomId) => {
   }
 
   room.status = 'selecting_topic';
-  
+
   if (room.customWords && room.customWords.length > 0) {
     const shuffled = [...room.customWords].sort(() => Math.random() - 0.5);
-    room.topicChoices = shuffled.slice(0, 3).map(term => ({ subject: 'Custom', subtopic: 'Room', term }));
+    const subjectLabel = room.subject || 'Custom';
+    const subtopicLabel = room.subtopic || 'Room';
+    room.topicChoices = shuffled.slice(0, 3).map(term => ({ subject: subjectLabel, subtopic: subtopicLabel, term }));
   } else {
     room.topicChoices = [
       getRandomWord(room.subject, room.subtopic),
       getRandomWord(room.subject, room.subtopic),
-      getRandomWord(room.subject, room.subtopic)
+      getRandomWord(room.subject, room.subtopic),
     ];
   }
-  
+
   room.timer = 10;
-  room.roundScores = {}; // Reset scores for new round
-  room.textBoxes = []; // Clear textboxes for new round
-  
+  room.roundId = (room.roundId || 0) + 1;
+  resetBoardState(room);
+
   io.to(roomId).emit('room_state_update', room);
   io.to(roomId).emit('canvas_clear');
 
@@ -95,7 +92,6 @@ const startNextRound = (io, roomId) => {
       io.to(roomId).emit('timer_sync', currentRoom.timer);
     } else {
       clearInterval(selectionInterval);
-      // Auto-pick first topic
       currentRoom.topic = currentRoom.topicChoices[0];
       startExplaining(io, roomId);
     }
@@ -136,26 +132,25 @@ const endRound = (io, roomId) => {
     clearTimeout(room.endTurnTimeout);
     room.endTurnTimeout = null;
   }
-  
-  // Calculate final score for the explainer
-  const explainerIndex = room.currentExplainerIndex % room.players.length;
+
+  // Snapshot scores immediately; clear the dictionary so a late submission
+  // can't corrupt the next round's tally.
+  const explainerIndex = room.currentExplainerIndex % Math.max(1, room.players.length);
   const explainer = room.players[explainerIndex];
-  if (explainer) {
-    const scores = Object.values(room.roundScores);
-    if (scores.length > 0) {
-      const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
-      explainer.totalPoints += avg;
-      explainer.roundsPlayed += 1;
-      explainer.avgScore = explainer.totalPoints / explainer.roundsPlayed;
-    }
+  const scoreSnapshot = Object.values(room.roundScores || {});
+  room.roundScores = {};
+  if (explainer && scoreSnapshot.length > 0) {
+    const avg = scoreSnapshot.reduce((a, b) => a + b, 0) / scoreSnapshot.length;
+    explainer.totalPoints = (explainer.totalPoints || 0) + avg;
+    explainer.roundsPlayed = (explainer.roundsPlayed || 0) + 1;
+    explainer.avgScore = explainer.totalPoints / explainer.roundsPlayed;
   }
 
   io.to(roomId).emit('room_state_update', room);
 
-  // 5 second transition
   let transitionTimer = 5;
   io.to(roomId).emit('transition_timer_sync', transitionTimer);
-  
+
   const transitionInterval = setInterval(() => {
     transitionTimer--;
     if (transitionTimer <= 0) {
@@ -170,5 +165,5 @@ const endRound = (io, roomId) => {
 module.exports = {
   startNextRound,
   endRound,
-  startExplaining
+  startExplaining,
 };
